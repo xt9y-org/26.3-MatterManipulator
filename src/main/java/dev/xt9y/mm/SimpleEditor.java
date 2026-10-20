@@ -189,7 +189,9 @@ final class SimpleEditor {
                 return 0;
             }
         }
-        if (next != s.mode && s.job != null) {
+        // Ctrl+V in Paste mode repositions the selection. Stop an active
+        // paste job too, rather than continuing to write at the old anchor.
+        if (s.job != null && (next != s.mode || next == Mode.PASTE)) {
             s.job.active = false;
             s.job = null;
         }
