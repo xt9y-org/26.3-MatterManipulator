@@ -11,6 +11,10 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.event.player.UseItemCallback;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 
 import dev.xt9y.mm.MatterManipulatorMod;
 import dev.xt9y.mm.StatePayload;
@@ -24,7 +28,7 @@ import dev.xt9y.mm.HoldPayload;
 public final class MatterManipulatorClient implements ClientModInitializer {
     private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(
         Identifier.fromNamespaceAndPath(MatterManipulatorMod.MOD_ID, "controls"));
-    private static final long HOLD_NANOS = 1_000_000_000L;
+    private static final long HOLD_NANOS = 250_000_000L;
 
     private final KeyMapping cycle = key("key.mattermanipulator.menu", InputConstants.KEY_M);
     private final KeyMapping control = key("key.mm-ctrl", InputConstants.KEY_LCONTROL);
@@ -35,11 +39,6 @@ public final class MatterManipulatorClient implements ClientModInitializer {
     private final KeyMapping flipX = key("key.mm-flip-x", InputConstants.KEY_X);
     private final KeyMapping flipY = key("key.mm-flip-y", InputConstants.KEY_Y);
     private final KeyMapping flipZ = key("key.mm-flip-z", InputConstants.KEY_Z);
-    // A separate vanilla mouse mapping follows SDL3 events even if
-    // Minecraft consumes/reset its own Use key during item interactions.
-    private final KeyMapping rightMouse = KeyMappingHelper.registerKeyMapping(
-        new KeyMapping("key.mm-right-mouse", InputConstants.Type.MOUSE,
-            InputConstants.MOUSE_BUTTON_RIGHT, CATEGORY));
 
     private boolean lastMouseDown;
     private long shiftedStartNanos;
@@ -78,6 +77,15 @@ public final class MatterManipulatorClient implements ClientModInitializer {
             return hit.getBlockPos().relative(hit.getDirection());
         return BlockPos.containing(mc.player.getEyePosition()
             .add(mc.player.getLookAngle().scale(5.0)));
+    }
+
+    // Vanilla use callbacks fire even on a click shorter than one client tick.
+    // Remember the actual targeted block now and commit selection on release,
+    // unless the 250 ms hold has started editing.
+    private void armShiftUse(BlockPos target) {
+        if (shiftedStartNanos != 0 || building) return;
+        shiftedStartNanos = System.nanoTime();
+        shiftedTarget = target;
     }
 
     private void cancelHold() {
@@ -125,7 +133,8 @@ public final class MatterManipulatorClient implements ClientModInitializer {
         while (flipY.consumeClick()) if (flipping) { cancelHold(); command(mc, "flip y"); changedMode = true; }
         while (flipZ.consumeClick()) if (flipping) { cancelHold(); command(mc, "flip z"); changedMode = true; }
 
-        boolean down = ready && rightMouse.isDown();
+        // Minecraft's configured Use Item/Place Block binding (mouse or keyboard).
+        boolean down = ready && mc.options.keyUse.isDown();
         boolean shift = ready && (mc.hasShiftDown() || mc.options.keyShift.isDown());
         long now = System.nanoTime();
 
@@ -135,21 +144,15 @@ public final class MatterManipulatorClient implements ClientModInitializer {
             return;
         }
 
-        if (down && !lastMouseDown) {
-            if (shift) {
-                shiftedStartNanos = now;
-                shiftedTarget = aimedBlock(mc);
-            } else {
-                // The actual item-use packet handles ordinary clicks server-side.
-                // This polling callback is only for shift short/long presses.
-            }
+        if (down && !lastMouseDown && shift) {
+            armShiftUse(aimedBlock(mc));
         }
 
         if (shiftedStartNanos != 0) {
             if (!down || !shift) {
                 // Short sneak-use selects the actual block, but only AFTER
                 // release. A long sneak-use never selects a new corner.
-                if (!building && !down && now - shiftedStartNanos < HOLD_NANOS)
+                if (!building && !down)
                     select(shiftedTarget);
                 cancelHold();
             } else if (!building && now - shiftedStartNanos >= HOLD_NANOS) {
@@ -170,6 +173,22 @@ public final class MatterManipulatorClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
+            if (level.isClientSide() && hand == InteractionHand.MAIN_HAND
+                    && player.getMainHandItem().is(MatterManipulatorMod.TOOL)
+                    && player.isShiftKeyDown()) {
+                armShiftUse(hit.getBlockPos());
+            }
+            return InteractionResult.PASS;
+        });
+        UseItemCallback.EVENT.register((player, level, hand) -> {
+            if (level.isClientSide() && hand == InteractionHand.MAIN_HAND
+                    && player.getMainHandItem().is(MatterManipulatorMod.TOOL)
+                    && player.isShiftKeyDown()) {
+                armShiftUse(null);
+            }
+            return InteractionResult.PASS;
+        });
         ClientPlayNetworking.registerGlobalReceiver(StatePayload.TYPE,
             (payload, context) -> context.client().execute(
                 () -> Preview.receiveState(payload.data())));

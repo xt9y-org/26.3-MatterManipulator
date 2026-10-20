@@ -18,11 +18,12 @@ import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import dev.xt9y.mm.MatterManipulatorMod;
 
 /**
- * Always-visible orange prediction when holding the tool.
+ * Always-visible mode-colored prediction when holding the tool.
  * The game-managed submit-node pipeline avoids nested render passes.
  */
 public final class SelectionRenderer {
     private static final int ORANGE = 0xFF9D2E;
+    private static final int BLUE = 0x34BFFF;
     private static final int MAX_HINTS = 1024;
 
     private record Selection(BlockPos a, BlockPos b, BlockPos hover, BlockPos target,
@@ -71,12 +72,12 @@ public final class SelectionRenderer {
     }
 
     private static void geometry(Selection s, Matrix4fc m, VertexConsumer v) {
-        // This single orange block is ALWAYS visible, even with no selection.
+        // This blue block is ALWAYS visible, even with no selection.
         if (s.hover() != null && !s.mode().equals("paste")) {
             BlockPos h = s.hover();
-            cube(m, v, h.getX(), h.getY(), h.getZ(), ORANGE, .24f);
+            cube(m, v, h.getX(), h.getY(), h.getZ(), BLUE, .24f);
             outline(m, v, h.getX(), h.getY(), h.getZ(),
-                h.getX()+1, h.getY()+1, h.getZ()+1, ORANGE, .86f, .026);
+                h.getX()+1, h.getY()+1, h.getZ()+1, BLUE, .86f, .026);
         }
 
         if (s.mode().equals("paste")) {
@@ -84,7 +85,7 @@ public final class SelectionRenderer {
             return;
         }
 
-        // While marking the second corner, predict the full region against the cursor.
+        // While marking the second corner, predict the full selected region against the cursor.
         if (s.a() != null) {
             BlockPos b = s.b() == null ? s.hover() : s.b();
             if (b != null) {
@@ -94,14 +95,14 @@ public final class SelectionRenderer {
                 int maxX = Math.max(s.a().getX(), b.getX()) + 1;
                 int maxY = Math.max(s.a().getY(), b.getY()) + 1;
                 int maxZ = Math.max(s.a().getZ(), b.getZ()) + 1;
-                outline(m, v, minX, minY, minZ, maxX, maxY, maxZ, ORANGE, .88f, .036);
+                outline(m, v, minX, minY, minZ, maxX, maxY, maxZ, BLUE, .88f, .036);
 
                 // Filling, copying, and cutting preview every sampled voxel
-                // as a transparent orange cube, never an unrelated green/blue box.
-                volume(m, v, minX, minY, minZ, maxX, maxY, maxZ, ORANGE);
-                cube(m, v, s.a().getX(), s.a().getY(), s.a().getZ(), ORANGE, .30f);
+                // as a transparent blue cube, never an unrelated green/blue box.
+                volume(m, v, minX, minY, minZ, maxX, maxY, maxZ, BLUE);
+                cube(m, v, s.a().getX(), s.a().getY(), s.a().getZ(), BLUE, .30f);
                 if (s.b() != null) {
-                    cube(m, v, s.b().getX(), s.b().getY(), s.b().getZ(), ORANGE, .30f);
+                    cube(m, v, s.b().getX(), s.b().getY(), s.b().getZ(), BLUE, .30f);
                 }
             }
         }

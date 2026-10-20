@@ -194,6 +194,10 @@ final class SimpleEditor {
         sync(player, s);
         say(player, title(next) + " mode"
             + (s.a != null && s.b != null ? " | Region selected" : ""));
+        if (next == Mode.COPY && s.a != null && s.b != null) {
+            // Copy captures immediately; no Shift+Use confirmation.
+            begin(player, s.b);
+        }
         return 1;
     }
 
@@ -274,6 +278,10 @@ final class SimpleEditor {
             say(player, "Region selected (" + (x * y * z) + " blocks)");
         }
         sync(player, s);
+        if (s.mode == Mode.COPY && s.b != null) {
+            // Automatically scan all blocks/NBT once both corners exist.
+            begin(player, s.b);
+        }
     }
 
     private static boolean loaded(ServerLevel level, BlockPos position) {
@@ -378,7 +386,7 @@ final class SimpleEditor {
 
     static int stop(ServerPlayer player) {
         Session s = session(player);
-        if (s.job != null) s.job.active = false;
+        if (s.job != null && s.job.mode != Mode.COPY) s.job.active = false;
         return 1;
     }
 
@@ -395,7 +403,10 @@ final class SimpleEditor {
                 continue;
             }
             ServerLevel level = (ServerLevel)player.level();
-            if (level.getGameTime() - job.lastPulse > HEARTBEAT_TIMEOUT) {
+            // Copy is automatically driven to completion; only destructive
+            // operations require continuing Shift+Use heartbeats.
+            if (job.mode != Mode.COPY
+                    && level.getGameTime() - job.lastPulse > HEARTBEAT_TIMEOUT) {
                 job.active = false;
                 continue;
             }
