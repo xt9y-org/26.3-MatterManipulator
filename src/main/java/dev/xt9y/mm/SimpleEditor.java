@@ -62,7 +62,6 @@ final class SimpleEditor {
         Mode mode = Mode.FILL;
         BlockPos a, b;
         ResourceKey<Level> dimension;
-        long lastSelectionTick = -100;
         Map<BlockPos, Cell> clipboard = Map.of();
         boolean cutClipboard;
         boolean flipX, flipY, flipZ;
@@ -252,9 +251,9 @@ final class SimpleEditor {
         // Paste uses the player's current aim when the hold begins;
         // ordinary clicks must not accidentally replace the saved selection.
         if (s.mode == Mode.PASTE) return;
-        long now = player.level().getGameTime();
-        if (now - s.lastSelectionTick < 4) return;
-        s.lastSelectionTick = now;
+        // The client sends exactly one packet per physical mouse press.
+        // No tick-based debounce here: rapid double-clicks may intentionally
+        // select two nearby corners or a single-block region.
         s.job = null;
         if (s.a == null || s.b != null) {
             s.a = clicked.immutable();

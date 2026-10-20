@@ -8,23 +8,29 @@ Install the JAR on both the client and dedicated server.
 
 ## Controls
 
-| Control | Action |
+| Input | Behavior |
 |---|---|
-| **M** | Cycle Fill Cube → Copy → Paste → Cut |
-| **Ctrl+C** | Select Copy mode |
-| **Ctrl+X** | Select Cut mode |
-| **Ctrl+V** | Select Paste mode |
-| **Ctrl+Z** | Clear the region selection |
-| **Right-click** | Mark the first and second corners (Fill, Copy or Cut mode) |
-| **Hold Shift+RMB for at least 1 second** | Begin the current operation; keep holding to process blocks incrementally |
-| **Release Shift or RMB** | Pause the operation; hold again for another second to resume it |
+| **RMB** (click a block) | Select the position **adjacent to the clicked face**, as in GTNH |
+| **Short Shift+RMB** (release before 1 s) | Select the **actual targeted block** instead of the adjacent position |
+| **Hold Shift+RMB for 1 second or longer** | Begin the current operation in batches; do not change selection |
+| **Release Shift or RMB** | Pause; hold again to resume the same queued job |
+| **M** | Cycle Fill Cube → Copy → Paste → Cut without resetting the region |
+| **Ctrl+C / Ctrl+X / Ctrl+V** | Switch to Copy / Cut / Paste |
+| **Ctrl+Z** | Clear the current selection |
+| **X / Y / Z** (Paste mode, without Ctrl) | Toggle a flip along that axis |
 
-**One selection is shared across modes.** Changing modes with M or Ctrl shortcuts
-does not reset the selected corners. Ordinary right-clicking in Paste mode does
-not replace the selection; paste uses your crosshair position when you begin holding.
-The entire selected volume is inclusive of both corners.
+One selection is shared across all modes. The orange preview in Paste
+mode follows the crosshair, showing the **full target region** with
+translucent example blocks. Flipping changes the positions and supported
+directional block-state properties; all supported block-entity NBT is retained.
 
-Use `/mm status` to inspect the region or `/mm clear` to reset it manually.
+Paste may be positioned beside an existing block face or five blocks into
+empty air. Holding Shift+RMB does not reselect corners. The offhand can be
+empty in Fill Cube mode to progressively fill with air.
+
+Use `/mm status` to see the selection, `/mm clear` to reset it, or
+`/mm flip x`, `/mm flip y`, `/mm flip z` to toggle the same paste flips
+through commands.
 
 ## Modes
 
@@ -60,8 +66,7 @@ and completed operations, for example:
 ```
 
 A transient action-bar message reports the number of blocks processed while
-you hold Shift+RMB. The server stops work on release or shortly after heartbeats
-stop. Re-holding resumes an unfinished operation in the same mode/selection.
+you hold Shift+RMB. The server stops work on release or shortly after network heartbeats stop. Re-holding resumes an unfinished operation in the same mode/selection.
 
 ## Limits and safety
 
@@ -81,7 +86,7 @@ stop. Re-holding resumes an unfinished operation in the same mode/selection.
 ## Install and build
 
 Download the latest successful
-[GitHub Release](https://github.com/xt9y/26.3-MatterManipulator/releases).
+[GitHub Release](https://github.com/xt9y-org/26.3-MatterManipulator/releases).
 Give yourself the Matter Manipulator:
 
 ```mcfunction
