@@ -25,7 +25,7 @@ public final class SelectionRenderer {
     private record Selection(BlockPos a, BlockPos b, int rgb, boolean guides,
                              String mode, java.util.List<BlockPos> clipboard,
                              BlockPos target, boolean cutting, boolean eraseFill,
-                             int turns, boolean mirror) {}
+                             BlockPos clipboardMax, boolean flipX, boolean flipY, boolean flipZ) {}
 
     public void register() {
         LevelExtractionEvents.END_EXTRACTION.register(ctx -> {
@@ -39,7 +39,7 @@ public final class SelectionRenderer {
                 state = new Selection(Preview.a, Preview.b, Preview.color, Preview.showGuides,
                     Preview.mode, Preview.clipboard, target, Preview.cutting,
                     mc.player.getOffhandItem().isEmpty(),
-                    Preview.rotation / 90, Preview.mirror);
+                    Preview.clipboardMax, Preview.flipX, Preview.flipY, Preview.flipZ);
             } else {
                 state = null;
             }
@@ -62,6 +62,11 @@ public final class SelectionRenderer {
     }
 
     private static void emitGeometry(Selection selection, Matrix4fc matrix, VertexConsumer vertices) {
+        if (selection.mode().equals("paste")) {
+            pasteBoundingBox(matrix, vertices, selection);
+            clipboardPreview(matrix, vertices, selection);
+            return;
+        }
         if (selection.a() == null) {
             // The player has copied blocks but may not have a selection active.
         } else if (selection.b() == null) {
@@ -104,27 +109,51 @@ public final class SelectionRenderer {
         clipboardPreview(matrix, vertices, selection);
     }
 
+    /** Orange world-space paste bounds, using the FULL clipboard extents, not sampled hints. */
+    private static void pasteBoundingBox(Matrix4fc m, VertexConsumer v, Selection selection) {
+        if (selection.clipboard().isEmpty() || selection.target() == null) return;
+        BlockPos target = selection.target();
+        BlockPos dimensions = selection.clipboardMax();
+        double x0 = target.getX(), y0 = target.getY(), z0 = target.getZ();
+        double x1 = x0 + dimensions.getX() + 1;
+        double y1 = y0 + dimensions.getY() + 1;
+        double z1 = z0 + dimensions.getZ() + 1;
+        double w = 0.037;
+        int orange = 0xFF992D;
+        for (int i = 0; i < 4; i++) {
+            double x = (i & 1) == 0 ? x0 : x1;
+            double z = (i & 2) == 0 ? z0 : z1;
+            box(m, v, x-w, y0, z-w, x+w, y1, z+w, orange, .90f);
+        }
+        for (int i = 0; i < 4; i++) {
+            double y = (i & 1) == 0 ? y0 : y1;
+            double z = (i & 2) == 0 ? z0 : z1;
+            box(m, v, x0, y-w, z-w, x1, y+w, z+w, orange, .90f);
+        }
+        for (int i = 0; i < 4; i++) {
+            double x = (i & 1) == 0 ? x0 : x1;
+            double y = (i & 2) == 0 ? y0 : y1;
+            box(m, v, x-w, y-w, z0, x+w, y+w, z1, orange, .90f);
+        }
+    }
+
     /** Preview pasted blocks at the crosshair, with transform and origin compensation. */
     private static void clipboardPreview(Matrix4fc matrix, VertexConsumer vertices, Selection selection) {
         if (selection.target() == null || selection.clipboard().isEmpty()) return;
         String mode = selection.mode();
         if (!mode.equals("paste")) return;
-        int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
-        for (BlockPos pos : selection.clipboard()) {
-            BlockPos p = transformed(pos, selection.turns(), selection.mirror());
-            minX = Math.min(minX, p.getX());
-            minY = Math.min(minY, p.getY());
-            minZ = Math.min(minZ, p.getZ());
-        }
         BlockPos dest = selection.target();
+        BlockPos size = selection.clipboardMax();
         int drawn = 0;
         for (BlockPos pos : selection.clipboard()) {
             if (++drawn > 768) return;
-            BlockPos t = transformed(pos, selection.turns(), selection.mirror());
-            double x = dest.getX() + t.getX() - minX + .5;
-            double y = dest.getY() + t.getY() - minY + .5;
-            double z = dest.getZ() + t.getZ() - minZ + .5;
-            box(matrix, vertices, x-.24,y-.24,z-.24,x+.24,y+.24,z+.24,0x76DFFF,.35f);
+            int offsetX = selection.flipX() ? size.getX() - pos.getX() : pos.getX();
+            int offsetY = selection.flipY() ? size.getY() - pos.getY() : pos.getY();
+            int offsetZ = selection.flipZ() ? size.getZ() - pos.getZ() : pos.getZ();
+            double x = dest.getX() + offsetX + .5;
+            double y = dest.getY() + offsetY + .5;
+            double z = dest.getZ() + offsetZ + .5;
+            box(matrix, vertices, x-.24,y-.24,z-.24,x+.24,y+.24,z+.24,0xFFA142,.34f);
         }
         if (selection.cutting() && selection.a() != null && selection.b() != null) {
             // Orange voxels at the source indicate blocks scheduled for removal.
@@ -138,17 +167,6 @@ public final class SelectionRenderer {
                 box(matrix, vertices, x-.24,y-.24,z-.24,x+.24,y+.24,z+.24,0xE8AB4A,.27f);
             }
         }
-    }
-
-    private static BlockPos transformed(BlockPos offset, int turns, boolean mirror) {
-        int x = mirror ? -offset.getX() : offset.getX();
-        int z = offset.getZ();
-        for (int i = 0; i < turns; i++) {
-            int oldX = x;
-            x = -z;
-            z = oldX;
-        }
-        return new BlockPos(x, offset.getY(), z);
     }
 
     /**

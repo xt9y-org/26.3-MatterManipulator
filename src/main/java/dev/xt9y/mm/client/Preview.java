@@ -15,8 +15,8 @@ public final class Preview {
     public static boolean visible = true;
     public static boolean showGuides = true;
     public static int color = 0x31DDFF;
-    public static int rotation = 0;
-    public static boolean mirror = false;
+    public static BlockPos clipboardMax = BlockPos.ZERO;
+    public static boolean flipX, flipY, flipZ;
     public static boolean cutting = false;
     public static List<BlockPos> clipboard = List.of();
     private static ClientLevel previous;
@@ -26,6 +26,8 @@ public final class Preview {
             previous = mc.level;
             a = b = null;
             clipboard = List.of();
+            clipboardMax = BlockPos.ZERO;
+            flipX = flipY = flipZ = false;
         }
     }
     private static BlockPos parse(String value) {
@@ -42,6 +44,12 @@ public final class Preview {
             a = parse(f[1]);
             b = parse(f[2]);
             cutting = Boolean.parseBoolean(f[4]);
+            if (f.length >= 9) {
+                flipX = Boolean.parseBoolean(f[5]);
+                flipY = Boolean.parseBoolean(f[6]);
+                flipZ = Boolean.parseBoolean(f[7]);
+                clipboardMax = parse(f[8]);
+            }
         } catch (RuntimeException ignored) {}
     }
     public static void receiveClipboard(String input) {
