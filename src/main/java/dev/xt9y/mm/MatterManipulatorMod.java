@@ -7,6 +7,10 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.server.level.ServerPlayer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.minecraft.commands.Commands;
@@ -66,6 +70,21 @@ public final class MatterManipulatorMod implements ModInitializer {
                 default -> {}
             }
         });
+        // Intercept right-click BEFORE vanilla chest/furnace/container handling.
+        // Without this, the block GUI can swallow a selection click before
+        // MatterManipulatorItem.useOn is ever invoked.
+        UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
+            if (hand != InteractionHand.MAIN_HAND || !player.getMainHandItem().is(TOOL)) {
+                return InteractionResult.PASS;
+            }
+            if (!level.isClientSide() && !player.isShiftKeyDown()
+                    && player instanceof ServerPlayer serverPlayer) {
+                SimpleEditor.select(serverPlayer,
+                    hit.getBlockPos().relative(hit.getDirection()));
+            }
+            return InteractionResult.SUCCESS;
+        });
+
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.TOOLS_AND_UTILITIES)
             .register(tab -> tab.accept(TOOL));
         ServerTickEvents.END_SERVER_TICK.register(SimpleEditor::tick);
