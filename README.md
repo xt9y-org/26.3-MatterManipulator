@@ -17,7 +17,9 @@ Install the JAR on both the client and dedicated server.
 | **M** | Cycle Fill Cube → Copy → Paste → Cut without resetting the region |
 | **Ctrl+C / Ctrl+X / Ctrl+V** | Switch to Copy / Cut / Paste |
 | **Ctrl+Z** | Clear the current selection |
-| **X / Y / Z** (Paste mode, without Ctrl) | Toggle a flip along that axis |
+| **Use once in Paste mode** | Lock the destination at the current orange preview position |
+| **Ctrl+V while already in Paste mode** | Unlock the destination to reposition the orange preview |
+| **X / Y / Z** (Paste mode, without Ctrl) | Toggle flips around the fixed destination |
 
 One selection is shared across all modes. The **preview is always
 visible when the tool is held**: blue in Fill, Copy and Cut, and orange in Paste.
@@ -28,8 +30,10 @@ visible when the tool is held**: blue in Fill, Copy and Cut, and orange in Paste
 - After the second corner: show the whole blue selected shape, with sampled translucent
   blue block hints.
 - In Paste mode: show the destination bounds and the **actual non-air clipboard
-  shape** in orange. Air positions are still included in the real paste; only
-  the transparent preview excludes them. X/Y/Z flips affect both preview and placement.
+  shape** in orange. One Use click locks that orange structure in the world,
+  so moving your crosshair no longer moves it. X/Y/Z flip around the locked
+  anchor. Ctrl+V releases the lock to choose a new position. Air positions
+  are still included in the real paste; only the preview excludes them.
 
 The colored ghosts represent block occupancy rather than textured Minecraft
 block models. Supported block-state orientations and full block-entity NBT are
@@ -61,10 +65,13 @@ The tool first captures every source block with its NBT and only then begins
 erasing source blocks progressively. The saved clipboard is retained until
 you paste it; once pasted, it is cleared to avoid accidentally repeating the move.
 
-**Paste:** Switch to Paste and look at your destination. Hold Shift+Use
-for at least 0.25 seconds to place the clipboard in batches of 48 positions
-per server tick. Looking at a block places next to the targeted face.
-Looking into air places five blocks ahead; the paste may overwrite existing blocks.
+**Paste:** Switch to Paste and look at your destination. Use once to lock
+the orange preview in place (adjacent to a clicked face, or five blocks in
+front when aiming into air). Flip using X/Y/Z without moving the anchor.
+Hold Shift+Use for at least 0.25 seconds to build at the **locked** location,
+in batches of 48 positions per server tick. Press Ctrl+V to unlock and
+select a new location, retaining the clipboard and flips. A paste may overwrite
+existing blocks.
 
 ## Chat and progress
 
@@ -117,7 +124,7 @@ See [UPSTREAM.md](UPSTREAM.md) and [LICENSE](LICENSE) for item artwork and LGPL-
 
 If an operation cannot start, check the server chat for `[MM] Cannot start:`
 messages. Fill/Copy/Cut require two corners; Paste requires a completed Copy or Cut.
-Build operations use the physical right mouse button and dedicated Fabric network
+Build operations use the configured Minecraft Use key and dedicated Fabric network
 packets, so the mod must be installed on **both client and server**. Quick ordinary
 Use clicks are handled by Minecraft's server-side item-use event rather than
 20 Hz input polling.

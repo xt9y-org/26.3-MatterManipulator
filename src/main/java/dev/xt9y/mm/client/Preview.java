@@ -10,7 +10,7 @@ import net.minecraft.core.BlockPos;
 
 /** Only selection corners and the clipboard outline are synchronized. */
 public final class Preview {
-    public static BlockPos a, b;
+    public static BlockPos a, b, pasteAnchor;
     public static String mode = "fill";
     public static boolean visible = true;
     public static boolean showGuides = true;
@@ -25,7 +25,7 @@ public final class Preview {
     public static void tick(Minecraft mc) {
         if (mc.level != previous) {
             previous = mc.level;
-            a = b = null;
+            a = b = pasteAnchor = null;
             clipboard = List.of();
             clipboardMax = BlockPos.ZERO;
             clipboardCount = 0;
@@ -53,6 +53,7 @@ public final class Preview {
                 flipZ = Boolean.parseBoolean(f[7]);
                 clipboardMax = parse(f[8]);
             }
+            pasteAnchor = f.length >= 10 ? parse(f[9]) : null;
         } catch (RuntimeException ignored) {}
     }
     public static void receiveClipboard(String input) {

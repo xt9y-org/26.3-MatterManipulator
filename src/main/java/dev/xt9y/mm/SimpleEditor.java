@@ -65,6 +65,7 @@ final class SimpleEditor {
         Map<BlockPos, Cell> clipboard = Map.of();
         boolean cutClipboard;
         boolean flipX, flipY, flipZ;
+        BlockPos pasteAnchor;
         Job job;
     }
 
@@ -73,6 +74,7 @@ final class SimpleEditor {
         if (s.dimension != null && !s.dimension.equals(player.level().dimension())) {
             s.a = null;
             s.b = null;
+            s.pasteAnchor = null;
             s.job = null;
         }
         s.dimension = player.level().dimension();
@@ -113,7 +115,8 @@ final class SimpleEditor {
             + (s.b == null ? "_" : coords(s.b)) + "|"
             + s.clipboard.size() + "|" + s.cutClipboard + "|"
             + s.flipX + "|" + s.flipY + "|" + s.flipZ + "|"
-            + coords(clipboardMax(s.clipboard));
+            + coords(clipboardMax(s.clipboard)) + "|"
+            + (s.pasteAnchor == null ? "_" : coords(s.pasteAnchor));
         net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, new StatePayload(data));
     }
 
@@ -190,10 +193,19 @@ final class SimpleEditor {
             s.job.active = false;
             s.job = null;
         }
+        // Re-entering Paste (Ctrl+V) unlocks the anchor for repositioning.
+        // Entering Paste from another mode also starts with a free preview.
+        if (next == Mode.PASTE || s.mode == Mode.PASTE) {
+            s.pasteAnchor = null;
+        }
         s.mode = next;
         sync(player, s);
-        say(player, title(next) + " mode"
-            + (s.a != null && s.b != null ? " | Region selected" : ""));
+        if (next == Mode.PASTE) {
+            say(player, "Paste mode | Position unlocked — Use to lock");
+        } else {
+            say(player, title(next) + " mode"
+                + (s.a != null && s.b != null ? " | Region selected" : ""));
+        }
         if (next == Mode.COPY && s.a != null && s.b != null) {
             // Copy captures immediately; no Shift+Use confirmation.
             begin(player, s.b);
@@ -205,7 +217,10 @@ final class SimpleEditor {
         Session s = session(player);
         sync(player, s);
         say(player, title(s.mode) + " | " +
-            (s.a == null ? "Select first corner" : s.b == null ? "Select second corner" : "Region selected")
+            (s.mode == Mode.PASTE
+                ? (s.pasteAnchor == null ? "Position unlocked" : "Position locked at " + coords(s.pasteAnchor))
+                : s.a == null ? "Select first corner"
+                : s.b == null ? "Select second corner" : "Region selected")
             + " | Clipboard: " + s.clipboard.size());
         return 1;
     }
@@ -214,6 +229,7 @@ final class SimpleEditor {
         Session s = session(player);
         s.a = null;
         s.b = null;
+        s.pasteAnchor = null;
         s.job = null;
         sync(player, s);
         say(player, "Selection cleared");
@@ -251,13 +267,27 @@ final class SimpleEditor {
         };
     }
 
-    /** Normal right-click marks corners only. No mode ever edits here. */
+    /** Normal Use chooses selection corners or locks the paste destination. */
     static void select(ServerPlayer player, BlockPos clicked) {
         if (!creative(player)) return;
         Session s = session(player);
-        // Paste uses the player's current aim when the hold begins;
-        // ordinary clicks must not accidentally replace the saved selection.
-        if (s.mode == Mode.PASTE) return;
+        if (s.mode == Mode.PASTE) {
+            if (s.pasteAnchor == null) {
+                if (s.clipboard.isEmpty()) {
+                    say(player, "Clipboard empty — Copy a region first");
+                    return;
+                }
+                if (s.job != null) {
+                    // A running paste keeps its original anchor.
+                    return;
+                }
+                s.pasteAnchor = clicked.immutable();
+                sync(player, s);
+                say(player, "Paste locked at " + coords(s.pasteAnchor)
+                    + " | X/Y/Z flip, Shift+Use to build, Ctrl+V to move");
+            }
+            return;
+        }
         // The client sends exactly one packet per physical mouse press.
         // No tick-based debounce here: rapid double-clicks may intentionally
         // select two nearby corners or a single-block region.
@@ -333,6 +363,11 @@ final class SimpleEditor {
             Job job;
             if (s.mode == Mode.PASTE) {
                 if (s.clipboard.isEmpty()) throw new IllegalArgumentException("Clipboard empty");
+                if (s.pasteAnchor == null) {
+                    throw new IllegalArgumentException("Lock a paste position with Use first");
+                }
+                // Ignore the current crosshair: placement uses the fixed anchor.
+                target = s.pasteAnchor;
                 List<BlockPos> positions = new ArrayList<>(s.clipboard.size());
                 List<Cell> cells = new ArrayList<>(s.clipboard.size());
                 BlockPos size = clipboardMax(s.clipboard);

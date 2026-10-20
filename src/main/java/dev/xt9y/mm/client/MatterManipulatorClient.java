@@ -152,7 +152,7 @@ public final class MatterManipulatorClient implements ClientModInitializer {
             if (!down || !shift) {
                 // Short sneak-use selects the actual block, but only AFTER
                 // release. A long sneak-use never selects a new corner.
-                if (!building && !down)
+                if (!building && !down && !"paste".equals(Preview.mode))
                     select(shiftedTarget);
                 cancelHold();
             } else if (!building && now - shiftedStartNanos >= HOLD_NANOS) {

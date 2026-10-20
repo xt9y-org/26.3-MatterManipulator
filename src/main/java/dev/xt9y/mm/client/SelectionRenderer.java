@@ -29,7 +29,8 @@ public final class SelectionRenderer {
     private record Selection(BlockPos a, BlockPos b, BlockPos hover, BlockPos target,
                              String mode, java.util.List<BlockPos> clipboard,
                              int clipboardCount, BlockPos clipboardMax,
-                             boolean flipX, boolean flipY, boolean flipZ) {}
+                             boolean flipX, boolean flipY, boolean flipZ,
+                             boolean locked) {}
     private Selection state;
 
     public void register() {
@@ -51,9 +52,11 @@ public final class SelectionRenderer {
                     .add(mc.player.getLookAngle().scale(5.0)));
                 hover = target;
             }
+            boolean locked = "paste".equals(Preview.mode) && Preview.pasteAnchor != null;
+            if (locked) target = Preview.pasteAnchor;
             state = new Selection(Preview.a, Preview.b, hover, target,
                 Preview.mode, Preview.clipboard, Preview.clipboardCount, Preview.clipboardMax,
-                Preview.flipX, Preview.flipY, Preview.flipZ);
+                Preview.flipX, Preview.flipY, Preview.flipZ, locked);
         });
         LevelRenderEvents.COLLECT_SUBMITS.register(this::render);
     }
@@ -122,7 +125,7 @@ public final class SelectionRenderer {
         }
         BlockPos max = s.clipboardMax();
         outline(m, v, x, y, z, x+max.getX()+1, y+max.getY()+1, z+max.getZ()+1,
-            ORANGE, .90f, .04);
+            ORANGE, s.locked() ? .96f : .80f, s.locked() ? .055 : .033);
 
         // Clipboard positions are sampled for previews but complete for actual paste.
         int hintCount = 0;
