@@ -1,0 +1,33 @@
+name: Temporary crash report diagnosis
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/crash-diagnostics.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read crash report
+        run: |
+          python3 - <<'PY'
+          import urllib.request, re
+          url='https://api.mclo.gs/1/raw/H0hpaLQ'
+          with urllib.request.urlopen(url,timeout=30) as response:
+              body=response.read(4000000).decode('utf-8','replace')
+          ls=body.splitlines()
+          print("CRASH LOG LEN",len(body),"LINES",len(ls))
+          found=[]
+          pat=re.compile(r'Exception|Error|Caused by:|MatterManipulator|mattermanipulator|SimpleEditor|SelectionRenderer|GLFW|FabricLoader|crash',re.I)
+          for i,x in enumerate(ls):
+              if pat.search(x): found.append(i)
+          print('MATCHES',len(found))
+          keep=set()
+          for i in found[-150:]:
+              keep.update(range(max(0,i-1),min(len(ls),i+6)))
+          if len(keep)<10:
+              keep.update(range(max(0,len(ls)-200),len(ls)))
+          for i in sorted(keep):
+              print(f"LOGLINE {i+1}: {ls[i][:850]}")
+          PY
