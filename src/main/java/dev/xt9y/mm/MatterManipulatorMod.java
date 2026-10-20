@@ -48,6 +48,19 @@ public final class MatterManipulatorMod implements ModInitializer {
                                 Integer.parseInt(parts[3])));
                     } catch (NumberFormatException ignored) {}
                 }
+                case "select" -> {
+                    if (parts.length != 4) return;
+                    try {
+                        BlockPos selected = new BlockPos(Integer.parseInt(parts[1]),
+                            Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+                        // Selection packets must describe nearby positions and be made
+                        // while holding the tool; the server owns all world edits.
+                        if (context.player().getMainHandItem().is(TOOL)
+                                && selected.distSqr(context.player().blockPosition()) <= 100) {
+                            SimpleEditor.select(context.player(), selected);
+                        }
+                    } catch (NumberFormatException ignored) {}
+                }
                 case "pulse" -> SimpleEditor.pulse(context.player());
                 case "stop" -> SimpleEditor.stop(context.player());
                 default -> {}
@@ -80,6 +93,10 @@ public final class MatterManipulatorMod implements ModInitializer {
                     .executes(ctx -> SimpleEditor.mode(ctx.getSource().getPlayerOrException(), "cut")))
                 .then(Commands.literal("paste")
                     .executes(ctx -> SimpleEditor.mode(ctx.getSource().getPlayerOrException(), "paste")))
+                .then(Commands.literal("flip")
+                    .then(Commands.argument("axis", StringArgumentType.word())
+                        .executes(ctx -> SimpleEditor.flip(ctx.getSource().getPlayerOrException(),
+                            StringArgumentType.getString(ctx, "axis")))))
                 .then(Commands.literal("shortcut")
                     .then(Commands.argument("name", StringArgumentType.word())
                         .executes(ctx -> SimpleEditor.shortcut(ctx.getSource().getPlayerOrException(),
