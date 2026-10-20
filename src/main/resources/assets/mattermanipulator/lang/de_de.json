@@ -1,0 +1,10 @@
+{
+  "item.mattermanipulator.matter_manipulator": "Matter Manipulator",
+  "key.mattermanipulator.menu": "Füllen / Kopieren / Einfügen / Ausschneiden",
+  "key.mm-ctrl": "Matter Manipulator Modifikator",
+  "key.mm-copy": "Matter Manipulator Kopieren",
+  "key.mm-cut": "Matter Manipulator Ausschneiden",
+  "key.mm-paste": "Matter Manipulator Einfügen",
+  "key.mm-reset": "Matter Manipulator Auswahl leeren",
+  "key.category.mattermanipulator.controls": "Matter Manipulator"
+}

@@ -1,0 +1,10 @@
+{
+  "item.mattermanipulator.matter_manipulator": "Matter Manipulator",
+  "key.mattermanipulator.menu": "Cycle Fill / Copy / Paste / Cut",
+  "key.mm-ctrl": "Matter Manipulator Modifier",
+  "key.mm-copy": "Matter Manipulator Copy",
+  "key.mm-cut": "Matter Manipulator Cut",
+  "key.mm-paste": "Matter Manipulator Paste",
+  "key.mm-reset": "Matter Manipulator Clear Selection",
+  "key.category.mattermanipulator.controls": "Matter Manipulator"
+}
