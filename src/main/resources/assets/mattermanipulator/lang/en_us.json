@@ -6,5 +6,6 @@
   "key.mm-cut": "Matter Manipulator Cut",
   "key.mm-paste": "Matter Manipulator Paste",
   "key.mm-reset": "Matter Manipulator Clear Selection",
-  "key.category.mattermanipulator.controls": "Matter Manipulator"
+  "key.category.mattermanipulator.controls": "Matter Manipulator",
+  "key.mm-right-mouse": "Matter Manipulator Right Mouse (Hold/Select)"
 }

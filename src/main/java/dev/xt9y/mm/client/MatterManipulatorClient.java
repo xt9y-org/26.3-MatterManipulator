@@ -6,7 +6,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
-import org.lwjgl.glfw.GLFW;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -36,6 +35,11 @@ public final class MatterManipulatorClient implements ClientModInitializer {
     private final KeyMapping flipX = key("key.mm-flip-x", InputConstants.KEY_X);
     private final KeyMapping flipY = key("key.mm-flip-y", InputConstants.KEY_Y);
     private final KeyMapping flipZ = key("key.mm-flip-z", InputConstants.KEY_Z);
+    // A separate vanilla mouse mapping follows SDL3 events even if
+    // Minecraft consumes/reset its own Use key during item interactions.
+    private final KeyMapping rightMouse = KeyMappingHelper.registerKeyMapping(
+        new KeyMapping("key.mm-right-mouse", InputConstants.Type.MOUSE,
+            InputConstants.MOUSE_BUTTON_RIGHT, CATEGORY));
 
     private boolean lastMouseDown;
     private long shiftedStartNanos;
@@ -74,13 +78,6 @@ public final class MatterManipulatorClient implements ClientModInitializer {
             return hit.getBlockPos().relative(hit.getDirection());
         return BlockPos.containing(mc.player.getEyePosition()
             .add(mc.player.getLookAngle().scale(5.0)));
-    }
-
-    // Use the physical mouse state. The vanilla Use key mapping can be
-    // consumed or reset by item interactions before END_CLIENT_TICK.
-    private static boolean rightMouseDown(net.minecraft.client.Minecraft mc) {
-        return GLFW.glfwGetMouseButton(mc.getWindow().handle(),
-            GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS;
     }
 
     private void cancelHold() {
@@ -128,7 +125,7 @@ public final class MatterManipulatorClient implements ClientModInitializer {
         while (flipY.consumeClick()) if (flipping) { cancelHold(); command(mc, "flip y"); changedMode = true; }
         while (flipZ.consumeClick()) if (flipping) { cancelHold(); command(mc, "flip z"); changedMode = true; }
 
-        boolean down = ready && rightMouseDown(mc);
+        boolean down = ready && rightMouse.isDown();
         boolean shift = ready && (mc.hasShiftDown() || mc.options.keyShift.isDown());
         long now = System.nanoTime();
 
