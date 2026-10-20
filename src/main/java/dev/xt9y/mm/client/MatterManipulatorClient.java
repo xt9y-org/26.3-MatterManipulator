@@ -6,6 +6,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
+import org.lwjgl.glfw.GLFW;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -51,9 +52,10 @@ public final class MatterManipulatorClient implements ClientModInitializer {
         if (mc.getConnection() != null) mc.getConnection().sendCommand("mm " + argument);
     }
 
-    private static void hold(String data) {
-        if (ClientPlayNetworking.canSend(HoldPayload.TYPE))
-            ClientPlayNetworking.send(new HoldPayload(data));
+    private static boolean hold(String data) {
+        if (!ClientPlayNetworking.canSend(HoldPayload.TYPE)) return false;
+        ClientPlayNetworking.send(new HoldPayload(data));
+        return true;
     }
 
     private static void select(BlockPos position) {
@@ -72,6 +74,13 @@ public final class MatterManipulatorClient implements ClientModInitializer {
             return hit.getBlockPos().relative(hit.getDirection());
         return BlockPos.containing(mc.player.getEyePosition()
             .add(mc.player.getLookAngle().scale(5.0)));
+    }
+
+    // Use the physical mouse state. The vanilla Use key mapping can be
+    // consumed or reset by item interactions before END_CLIENT_TICK.
+    private static boolean rightMouseDown(net.minecraft.client.Minecraft mc) {
+        return GLFW.glfwGetMouseButton(mc.getWindow().handle(),
+            GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS;
     }
 
     private void cancelHold() {
@@ -119,8 +128,8 @@ public final class MatterManipulatorClient implements ClientModInitializer {
         while (flipY.consumeClick()) if (flipping) { cancelHold(); command(mc, "flip y"); changedMode = true; }
         while (flipZ.consumeClick()) if (flipping) { cancelHold(); command(mc, "flip z"); changedMode = true; }
 
-        boolean down = ready && mc.options.keyUse.isDown();
-        boolean shift = ready && (mc.options.keyShift.isDown() || mc.player.isShiftKeyDown());
+        boolean down = ready && rightMouseDown(mc);
+        boolean shift = ready && (mc.hasShiftDown() || mc.options.keyShift.isDown());
         long now = System.nanoTime();
 
         if (changedMode || !ready) {
@@ -149,9 +158,12 @@ public final class MatterManipulatorClient implements ClientModInitializer {
                 cancelHold();
             } else if (!building && now - shiftedStartNanos >= HOLD_NANOS) {
                 BlockPos target = adjacent(mc);
-                hold("start:" + target.getX() + ":" + target.getY() + ":" + target.getZ());
-                building = true;
-                heartbeatTicks = 0;
+                // Don't claim the operation started when the server doesn't
+                // advertise our packet channel (e.g. mod missing server-side).
+                if (hold("start:" + target.getX() + ":" + target.getY() + ":" + target.getZ())) {
+                    building = true;
+                    heartbeatTicks = 0;
+                }
             } else if (building && ++heartbeatTicks >= 4) {
                 hold("pulse");
                 heartbeatTicks = 0;
