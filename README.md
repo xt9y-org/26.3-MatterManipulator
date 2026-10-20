@@ -19,10 +19,21 @@ Install the JAR on both the client and dedicated server.
 | **Ctrl+Z** | Clear the current selection |
 | **X / Y / Z** (Paste mode, without Ctrl) | Toggle a flip along that axis |
 
-One selection is shared across all modes. The orange preview in Paste
-mode follows the crosshair, showing the **full target region** with
-translucent example blocks. Flipping changes the positions and supported
-directional block-state properties; all supported block-entity NBT is retained.
+One selection is shared across all modes. The **orange preview is always
+visible when the tool is held**:
+
+- Before selecting: highlight the exact block that the next RMB click would select
+  (adjacent face, or the actual clicked block when holding Shift).
+- After the first corner: show the growing orange cube between that corner and the crosshair.
+- After the second corner: show the whole selected shape, with sampled translucent
+  orange block hints.
+- In Paste mode: show the destination bounds and the **actual non-air clipboard
+  shape** in orange. Air positions are still included in the real paste; only
+  the transparent preview excludes them. X/Y/Z flips affect both preview and placement.
+
+The orange ghosts represent block occupancy rather than textured Minecraft
+block models. Supported block-state orientations and full block-entity NBT are
+preserved by the actual paste.
 
 Paste may be positioned beside an existing block face or five blocks into
 empty air. Holding Shift+RMB does not reselect corners. The offhand can be
@@ -100,3 +111,12 @@ Build from source with `./gradlew build`.
 Original mod: [RecursivePineapple/MatterManipulator](https://github.com/RecursivePineapple/MatterManipulator).
 GTNH fork: [GTNewHorizons/MatterManipulator](https://github.com/GTNewHorizons/MatterManipulator).
 See [UPSTREAM.md](UPSTREAM.md) and [LICENSE](LICENSE) for item artwork and LGPL-3.0 attribution.
+
+## Troubleshooting
+
+If an operation cannot start, check the server chat for `[MM] Cannot start:`
+messages. Fill/Copy/Cut require two corners; Paste requires a completed Copy or Cut.
+Build operations use the physical right mouse button and dedicated Fabric network
+packets, so the mod must be installed on **both client and server**. Quick ordinary
+RMB clicks are handled by Minecraft's server-side item-use event rather than
+20 Hz input polling.
