@@ -19,6 +19,8 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -63,6 +65,7 @@ final class SimpleEditor {
         long lastSelectionTick = -100;
         Map<BlockPos, Cell> clipboard = Map.of();
         boolean cutClipboard;
+        boolean flipX, flipY, flipZ;
         Job job;
     }
 
@@ -109,8 +112,50 @@ final class SimpleEditor {
         String data = s.mode.name().toLowerCase(java.util.Locale.ROOT) + "|"
             + (s.a == null ? "_" : coords(s.a)) + "|"
             + (s.b == null ? "_" : coords(s.b)) + "|"
-            + s.clipboard.size() + "|" + s.cutClipboard;
+            + s.clipboard.size() + "|" + s.cutClipboard + "|"
+            + s.flipX + "|" + s.flipY + "|" + s.flipZ + "|"
+            + coords(clipboardMax(s.clipboard));
         net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, new StatePayload(data));
+    }
+
+
+    private static BlockPos clipboardMax(Map<BlockPos, Cell> clipboard) {
+        int x = 0, y = 0, z = 0;
+        for (BlockPos p : clipboard.keySet()) {
+            x = Math.max(x, p.getX());
+            y = Math.max(y, p.getY());
+            z = Math.max(z, p.getZ());
+        }
+        return new BlockPos(x, y, z);
+    }
+
+    /** Vertical mirror handles facing and top/bottom, upper/lower properties. */
+    private static <T extends Comparable<T>> BlockState flipVerticalProperty(BlockState state, Property<T> property) {
+        String value = property.getName(state.getValue(property));
+        String opposite = switch (value) {
+            case "up" -> "down";
+            case "down" -> "up";
+            case "top" -> "bottom";
+            case "bottom" -> "top";
+            case "upper" -> "lower";
+            case "lower" -> "upper";
+            case "floor" -> "ceiling";
+            case "ceiling" -> "floor";
+            default -> null;
+        };
+        if (opposite == null) return state;
+        return property.getValue(opposite).map(next -> state.setValue(property, next)).orElse(state);
+    }
+
+    private static BlockState flippedState(BlockState state, Session s) {
+        if (s.flipX) state = state.mirror(Mirror.FRONT_BACK);
+        if (s.flipZ) state = state.mirror(Mirror.LEFT_RIGHT);
+        if (s.flipY) {
+            // Copy the properties before replacing values on immutable block states.
+            List<Property<?>> properties = new ArrayList<>(state.getProperties());
+            for (Property<?> property : properties) state = flipVerticalProperty(state, property);
+        }
+        return state;
     }
 
     private static void syncClipboard(ServerPlayer player, Session s) {
@@ -166,6 +211,27 @@ final class SimpleEditor {
         s.job = null;
         sync(player, s);
         say(player, "Selection cleared");
+        return 1;
+    }
+
+    static int flip(ServerPlayer player, String axis) {
+        if (!creative(player)) return 0;
+        Session s = session(player);
+        if (s.mode != Mode.PASTE) return 0;
+        if (s.job != null) {
+            s.job.active = false;
+            s.job = null;
+        }
+        boolean enabled;
+        switch (axis.toLowerCase(java.util.Locale.ROOT)) {
+            case "x" -> { s.flipX = !s.flipX; enabled = s.flipX; }
+            case "y" -> { s.flipY = !s.flipY; enabled = s.flipY; }
+            case "z" -> { s.flipZ = !s.flipZ; enabled = s.flipZ; }
+            default -> { return 0; }
+        }
+        sync(player, s);
+        say(player, "Paste flip " + axis.toUpperCase(java.util.Locale.ROOT) + ": " +
+            (enabled ? "ON" : "OFF"));
         return 1;
     }
 
@@ -259,12 +325,19 @@ final class SimpleEditor {
                 if (s.clipboard.isEmpty()) throw new IllegalArgumentException("Clipboard empty");
                 List<BlockPos> positions = new ArrayList<>(s.clipboard.size());
                 List<Cell> cells = new ArrayList<>(s.clipboard.size());
+                BlockPos size = clipboardMax(s.clipboard);
                 for (Map.Entry<BlockPos, Cell> entry : s.clipboard.entrySet()) {
-                    BlockPos dest = target.offset(entry.getKey());
+                    BlockPos offset = entry.getKey();
+                    int x = s.flipX ? size.getX() - offset.getX() : offset.getX();
+                    int y = s.flipY ? size.getY() - offset.getY() : offset.getY();
+                    int z = s.flipZ ? size.getZ() - offset.getZ() : offset.getZ();
+                    BlockPos dest = target.offset(x, y, z);
                     if (!loaded(level, dest)) throw new IllegalArgumentException("Destination includes unloaded/out-of-world blocks");
-                    validateEntity(level, dest, entry.getValue());
+                    Cell original = entry.getValue();
+                    Cell transformed = new Cell(flippedState(original.state(), s), original.nbt());
+                    validateEntity(level, dest, transformed);
                     positions.add(dest);
-                    cells.add(entry.getValue());
+                    cells.add(transformed);
                 }
                 job = new Job(s.mode, level.dimension(), positions, cells, target, null);
             } else {
