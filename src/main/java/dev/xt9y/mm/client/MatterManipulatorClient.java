@@ -143,9 +143,8 @@ public final class MatterManipulatorClient implements ClientModInitializer {
                 shiftedStartNanos = now;
                 shiftedTarget = aimedBlock(mc);
             } else {
-                // One packet per physical press; holding ordinary RMB
-                // can no longer reselect the corners repeatedly.
-                select(adjacent(mc));
+                // The actual item-use packet handles ordinary clicks server-side.
+                // This polling callback is only for shift short/long presses.
             }
         }
 
