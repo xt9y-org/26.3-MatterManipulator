@@ -1,0 +1,27 @@
+name: Temporary crash report lgpNBtC
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/diagnose-lgpNBtC.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect new Minecraft crash log
+        run: |
+          python3 - <<'PY'
+          import urllib.request,re
+          u="https://api.mclo.gs/1/raw/lgpNBtC"
+          with urllib.request.urlopen(u,timeout=25) as r:
+              txt=r.read(4000000).decode("utf-8","replace")
+          lines=txt.splitlines()
+          print("LOG_META lines=",len(lines),"chars=",len(txt))
+          indices=[i for i,l in enumerate(lines) if re.search(r"Caused by:|Exception|Error:|SelectionRenderer|MatterManipulator|mattermanipulator|IllegalStateException|crash",l,re.I)]
+          print("MATCHES",len(indices))
+          use=set()
+          for i in indices[-180:]:use.update(range(max(0,i-2),min(len(lines),i+8)))
+          if len(use)<10:use.update(range(max(0,len(lines)-200),len(lines)))
+          for i in sorted(use):print("LINE %d: %s"%(i+1,lines[i][:1200]))
+          PY
