@@ -3,6 +3,8 @@ package dev.xt9y.mm;
 import java.util.function.Consumer;
 
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -22,13 +24,24 @@ public final class MatterManipulatorItem extends Item {
     public InteractionResult useOn(UseOnContext context) {
         Player player = context.getPlayer();
         if (player == null) return InteractionResult.PASS;
-        // Selection is handled by the client's debounced mouse transition.
-        // Returning success prevents the targeted chest or block from opening.
+        // Actual vanilla use events catch fast clicks that fall between
+        // 20 Hz client ticks. Normal RMB selects the adjacent face position.
+        if (!context.getLevel().isClientSide() && !player.isShiftKeyDown()
+                && player instanceof ServerPlayer server) {
+            SimpleEditor.select(server,
+                context.getClickedPos().relative(context.getClickedFace()));
+        }
         return InteractionResult.SUCCESS;
     }
 
     @Override
     public InteractionResult use(Level level, Player player, InteractionHand hand) {
+        if (!level.isClientSide() && !player.isShiftKeyDown()
+                && player instanceof ServerPlayer server) {
+            BlockPos forward = BlockPos.containing(server.getEyePosition()
+                .add(server.getLookAngle().scale(5.0)));
+            SimpleEditor.select(server, forward);
+        }
         return InteractionResult.SUCCESS;
     }
 
