@@ -27,7 +27,8 @@ public final class SelectionRenderer {
 
     private record Selection(BlockPos a, BlockPos b, BlockPos hover, BlockPos target,
                              String mode, java.util.List<BlockPos> clipboard,
-                             BlockPos clipboardMax, boolean flipX, boolean flipY, boolean flipZ) {}
+                             int clipboardCount, BlockPos clipboardMax,
+                             boolean flipX, boolean flipY, boolean flipZ) {}
     private Selection state;
 
     public void register() {
@@ -50,7 +51,7 @@ public final class SelectionRenderer {
                 hover = target;
             }
             state = new Selection(Preview.a, Preview.b, hover, target,
-                Preview.mode, Preview.clipboard, Preview.clipboardMax,
+                Preview.mode, Preview.clipboard, Preview.clipboardCount, Preview.clipboardMax,
                 Preview.flipX, Preview.flipY, Preview.flipZ);
         });
         LevelRenderEvents.COLLECT_SUBMITS.register(this::render);
@@ -112,7 +113,7 @@ public final class SelectionRenderer {
         int y = s.target().getY();
         int z = s.target().getZ();
 
-        if (s.clipboard().isEmpty()) {
+        if (s.clipboardCount() == 0) {
             // Paste target stays visible even if no clipboard has been copied yet.
             outline(m, v, x, y, z, x+1, y+1, z+1, ORANGE, .85f, .028);
             cube(m, v, x, y, z, ORANGE, .2f);

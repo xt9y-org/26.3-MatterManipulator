@@ -16,6 +16,7 @@ public final class Preview {
     public static boolean showGuides = true;
     public static int color = 0x31DDFF;
     public static BlockPos clipboardMax = BlockPos.ZERO;
+    public static int clipboardCount;
     public static boolean flipX, flipY, flipZ;
     public static boolean cutting = false;
     public static List<BlockPos> clipboard = List.of();
@@ -27,6 +28,7 @@ public final class Preview {
             a = b = null;
             clipboard = List.of();
             clipboardMax = BlockPos.ZERO;
+            clipboardCount = 0;
             flipX = flipY = flipZ = false;
         }
     }
@@ -43,6 +45,7 @@ public final class Preview {
             mode = f[0].toLowerCase(Locale.ROOT);
             a = parse(f[1]);
             b = parse(f[2]);
+            clipboardCount = Integer.parseInt(f[3]);
             cutting = Boolean.parseBoolean(f[4]);
             if (f.length >= 9) {
                 flipX = Boolean.parseBoolean(f[5]);

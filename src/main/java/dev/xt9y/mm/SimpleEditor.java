@@ -161,10 +161,13 @@ final class SimpleEditor {
         if (!net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(player, ClipboardPayload.TYPE)) return;
         StringBuilder result = new StringBuilder();
         int count = 0;
-        for (BlockPos offset : s.clipboard.keySet()) {
+        // A clipboard includes AIR for actual paste, but the translucent
+        // structure preview must not draw a fake solid cube at empty positions.
+        for (Map.Entry<BlockPos, Cell> entry : s.clipboard.entrySet()) {
+            if (entry.getValue().state().isAir()) continue;
             if (count++ >= 768) break;
             if (!result.isEmpty()) result.append(';');
-            result.append(coords(offset));
+            result.append(coords(entry.getKey()));
         }
         net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, new ClipboardPayload(result.toString()));
     }
