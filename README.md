@@ -1,6 +1,6 @@
-# Matter Manipulator — Minecraft 26.3
+# Matter Manipulator — Minecraft 26.3 (v1.0.0)
 
-A focused Fabric 26.3 implementation of **Fill Cube, Copy, Paste and Cut**.
+The **v1.0.0** release is a focused Fabric 26.3 implementation of **Fill Cube, Copy, Paste and Cut**.
 There is no GUI, radial menu, energy system or other building modes.
 
 **Requires Minecraft 26.3, Java 25 and Fabric API.**
@@ -99,13 +99,12 @@ you hold Shift+Use. The server stops work on release or shortly after network he
   operation, **not** blocks already edited. Back up your test world.
 - No region claim or anti-grief plugin integration. Do not give the tool to
   untrusted players on shared servers.
-- The GitHub workflow checks compilation and publishes prerelease JARs; it does
+- The GitHub workflow checks compilation and publishes tagged stable builds; it does
   not perform an in-game render, block-entity or multiplayer test.
 
 ## Install and build
 
-Download the latest successful
-[GitHub Release](https://github.com/xt9y-org/26.3-MatterManipulator/releases).
+Download the **[v1.0.0 stable release](https://github.com/xt9y-org/26.3-MatterManipulator/releases/tag/v1.0.0)** and install its `matter-manipulator-26.3-1.0.0.jar`. Remove older alpha versions from the mods folder.
 Give yourself the Matter Manipulator:
 
 ```mcfunction

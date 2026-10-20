@@ -18,25 +18,44 @@ jobs:
       - name: Build mod JAR
         run: |
           chmod +x ./gradlew
-          ./gradlew --no-daemon --stacktrace build
-      - name: Upload test JAR
+          ./gradlew --no-daemon --stacktrace clean build
+      - name: Package release JAR
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's/^version=//p' gradle.properties | head -n 1)"
+          test -n "$VERSION"
+          [[ "$VERSION" != *-* ]] || { echo "Stable releases require a non-prerelease version"; exit 1; }
+          JAR="$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' -print -quit)"
+          test -n "$JAR" && test -s "$JAR"
+          mkdir -p dist
+          cp "$JAR" "dist/matter-manipulator-26.3-${VERSION}.jar"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "jar=dist/matter-manipulator-26.3-${VERSION}.jar" >> "$GITHUB_OUTPUT"
+      - name: Upload tested JAR
         uses: actions/upload-artifact@v4
         with:
-          name: matter-manipulator-26.3-test-jar
-          path: build/libs/*.jar
+          name: matter-manipulator-26.3-${{ steps.package.outputs.version }}
+          path: ${{ steps.package.outputs.jar }}
           if-no-files-found: error
-      - name: Create prerelease with JAR
+      - name: Publish stable release
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_NUMBER: ${{ github.run_number }}
           REVISION: ${{ github.sha }}
+          VERSION: ${{ steps.package.outputs.version }}
+          RELEASE_JAR: ${{ steps.package.outputs.jar }}
+        shell: bash
         run: |
-          set -eu
-          TAG="v0.1.0-alpha.${RUN_NUMBER}"
-          JAR="$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' | head -n 1)"
-          test -n "$JAR"
-          gh release create "$TAG" "$JAR" --target "$REVISION" \
-            --title "Matter Manipulator 26.3 alpha ${RUN_NUMBER}" \
-            --notes "Experimental Fabric 26.3 port. Not GTNH feature-complete. See README and UPSTREAM.md." \
-            --prerelease
+          set -euo pipefail
+          TAG="v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; skipping publication."
+            exit 0
+          fi
+          gh release create "$TAG" "$RELEASE_JAR" \
+            --target "$REVISION" \
+            --title "Matter Manipulator 26.3 v${VERSION}" \
+            --notes-file RELEASE_NOTES.md \
+            --latest

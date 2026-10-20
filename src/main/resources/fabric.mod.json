@@ -3,13 +3,20 @@
   "id": "mattermanipulator",
   "version": "${version}",
   "name": "Matter Manipulator (26.3)",
-  "description": "Fabric 26.3 port of GTNH Matter Manipulator building and placement modes.",
-  "authors": ["xt9y", "Original mod: RecursivePineapple"],
+  "description": "Minecraft 26.3 Fabric world-editing tool with Fill Cube, Copy, Cut and locked-position Paste.",
+  "authors": [
+    "xt9y",
+    "Original mod: RecursivePineapple"
+  ],
   "license": "LGPL-3.0-only",
   "environment": "*",
   "entrypoints": {
-    "main": ["dev.xt9y.mm.MatterManipulatorMod"],
-    "client": ["dev.xt9y.mm.client.MatterManipulatorClient"]
+    "main": [
+      "dev.xt9y.mm.MatterManipulatorMod"
+    ],
+    "client": [
+      "dev.xt9y.mm.client.MatterManipulatorClient"
+    ]
   },
   "depends": {
     "minecraft": "~26.3",
