@@ -77,6 +77,13 @@ public final class MatterManipulatorMod implements ModInitializer {
             if (hand != InteractionHand.MAIN_HAND || !player.getMainHandItem().is(TOOL)) {
                 return InteractionResult.PASS;
             }
+            // Client Shift+Use must reach the client listener registered by
+            // MatterManipulatorClient so it can distinguish short selection
+            // from a >=250 ms edit hold. Returning SUCCESS here prevents
+            // later UseBlockCallback listeners from running.
+            if (level.isClientSide() && player.isShiftKeyDown()) {
+                return InteractionResult.PASS;
+            }
             if (!level.isClientSide() && !player.isShiftKeyDown()
                     && player instanceof ServerPlayer serverPlayer) {
                 SimpleEditor.select(serverPlayer,
