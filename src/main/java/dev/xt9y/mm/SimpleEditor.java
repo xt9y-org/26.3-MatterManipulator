@@ -401,7 +401,7 @@ final class SimpleEditor {
                 if (s.cutClipboard) {
                     if (s.cutDimension == null || s.cutOrigin == null)
                         throw new IllegalArgumentException("Cut source is missing");
-                    ServerLevel sourceLevel = player.getServer().getLevel(s.cutDimension);
+                    ServerLevel sourceLevel = player.level().getServer().getLevel(s.cutDimension);
                     if (sourceLevel == null)
                         throw new IllegalArgumentException("Cut source dimension is unavailable");
 
@@ -511,7 +511,7 @@ final class SimpleEditor {
             BlockPos pos = erasingSource ? job.erasePositions.get(job.index)
                 : job.positions.get(job.index);
             ServerLevel workLevel = erasingSource
-                ? player.getServer().getLevel(job.sourceDimension) : level;
+                ? player.level().getServer().getLevel(job.sourceDimension) : level;
             if (workLevel == null || !loaded(workLevel, pos))
                 throw new IllegalArgumentException("Chunk unloaded while editing");
 
