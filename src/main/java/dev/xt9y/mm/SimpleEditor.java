@@ -27,7 +27,7 @@ import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
-/** One selection, four modes and a resumable, server-ticked work queue. */
+/** One selection, instant Copy/Cut/Paste and server-ticked Fill Cube. */
 final class SimpleEditor {
     private static final int MAX_BLOCKS = 32768;
     private static final int BLOCKS_PER_TICK = 48;
@@ -501,9 +501,17 @@ final class SimpleEditor {
             job.active = true;
             job.lastPulse = level.getGameTime();
             s.job = job;
-            progress(player, title(job.mode) + " 0/" + job.positions.size());
+            if (job.mode == Mode.FILL) {
+                // Fill Cube retains its progressive, resumable behavior.
+                progress(player, title(job.mode) + " 0/" + job.positions.size());
+            } else {
+                // One server-side operation: capture/paste every block, including
+                // any Cut-source cleanup, before returning to the game loop.
+                process(player, s, job, level);
+            }
             return 1;
         } catch (RuntimeException exception) {
+            s.job = null;
             say(player, "Cannot start: " + exception.getMessage());
             return 0;
         }
@@ -524,7 +532,7 @@ final class SimpleEditor {
         return 1;
     }
 
-    /** Register from END_SERVER_TICK. Each edit stays bounded per tick. */
+    /** Only Fill Cube needs server ticks; other operations finish in begin(). */
     static void tick(MinecraftServer server) {
         for (Map.Entry<UUID, Session> entry : SESSIONS.entrySet()) {
             Session s = entry.getValue();
@@ -554,7 +562,9 @@ final class SimpleEditor {
     }
 
     private static void process(ServerPlayer player, Session session, Job job, ServerLevel level) {
-        int budget = BLOCKS_PER_TICK;
+        // Cut paste can have both a destination pass and a source-erase pass.
+        // Finish both in the same invocation; only Fill uses the small tick budget.
+        int budget = job.mode == Mode.FILL ? BLOCKS_PER_TICK : 2 * MAX_BLOCKS + 2;
         while (budget-- > 0 && session.job == job) {
             int total = job.mode == Mode.PASTE && job.phase == 1
                 ? job.erasePositions.size() : job.positions.size();

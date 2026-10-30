@@ -1,6 +1,6 @@
-# Matter Manipulator — Minecraft 26.3 (v1.0.2)
+# Matter Manipulator — Minecraft 26.3 (v1.0.3)
 
-The **v1.0.2** release is a focused Fabric 26.3 implementation of **Fill Cube, Copy, Paste and Cut**.
+The **v1.0.3** release is a focused Fabric 26.3 implementation of **Fill Cube, Copy, Paste and Cut**.
 There is no GUI, radial menu, energy system or other building modes.
 
 **Requires Minecraft 26.3, Java 25 and Fabric API.**
@@ -12,8 +12,9 @@ Install the JAR on both the client and dedicated server.
 |---|---|
 | **Use** (click a block) | Select the position **adjacent to the clicked face**, as in GTNH |
 | **Short Shift+Use** (release before 0.25 s) | Select the **actual targeted block** instead of the adjacent position |
-| **Hold Shift+Use for 0.25 seconds or longer** | Begin the current operation in batches; do not change selection |
-| **Release Shift or Use** | Pause; hold again to resume the same queued job |
+| **Shift+Use in Paste mode** | Paste instantly in a single server operation (no 0.25-second wait) |
+| **Hold Shift+Use for 0.25 seconds in Fill Cube** | Begin progressive filling (48 blocks/server tick) |
+| **Release Shift or Use (Fill Cube)** | Pause; hold again to resume the fill |
 | **M** | Enter Geometry mode (Fill Cube); no longer cycles Copy/Paste/Cut |
 | **Hold M + mouse wheel** | Geometry wheel: Fill Cube is currently the only option; scrolling does not change the hotbar |
 | **Ctrl+G** | Enter Geometry mode (Fill Cube) |
@@ -24,7 +25,7 @@ Install the JAR on both the client and dedicated server.
 | **X / Y / Z** (Paste mode, without Ctrl) | Toggle flips around the fixed destination |
 | **R** (Paste mode) | Rotate clipboard 90° clockwise around Y |
 | **Shift+R** (Paste mode) | Rotate clipboard 90° around X |
-| **Ctrl+Shift+Use** (Paste mode, hold 0.25 s) | Air-only paste: place non-air clipboard blocks into air, skipping all occupied destination blocks |
+| **Ctrl+Shift+Use** (Paste mode) | Instant air-only paste: place non-air clipboard blocks into air, skipping occupied destination blocks |
 
 One selection is shared across all modes. The **preview is always
 visible when the tool is held**: blue in Fill, Copy and Cut, and orange in Paste.
@@ -62,13 +63,13 @@ block state. **An empty offhand means Air**, so it gradually clears the cube.
 A nonempty offhand containing a non-block item does not erase anything.
 
 **Copy:** Select two corners in Copy mode, or switch to Copy with an existing
-completed selection. Capturing starts automatically, without Shift+Use, and
-progressively scans the region without editing the world.
+completed selection. The entire structure is captured immediately in one server
+operation without holding Shift+Use, and the world remains unchanged.
 All states, air blocks, and complete supported block-entity NBT (including
 chest and other inventories) are captured.
 
 **Cut:** Select a region and press Ctrl+X (or switch to Cut). The complete
-source region and block-entity NBT are captured automatically, just like Copy.
+source region and block-entity NBT are captured instantly, just like Copy.
 The original blocks **remain in place** until the destination has been pasted.
 After all destination blocks are placed, source blocks outside the destination
 are gradually erased. Overlapping source/destination regions are handled without
@@ -78,9 +79,11 @@ is cleared only after the move finishes, avoiding an accidental second move.
 **Paste:** Switch to Paste and look at your destination. Use once to lock
 the orange preview in place (adjacent to a clicked face, or five blocks in
 front when aiming into air). Flip using X/Y/Z without moving the anchor.
-Hold Shift+Use for at least 0.25 seconds to build at the **locked** location,
-in batches of 48 positions per server tick. Press Ctrl+V to unlock and
-select a new location, retaining the clipboard, rotations and flips. A regular
+Press Shift+Use once to paste the entire structure immediately at the **locked**
+location. The server writes all destination blocks (and clears the original
+source after a Cut) in the same operation, not across multiple ticks.
+Press Ctrl+V to unlock and select a new location, retaining the clipboard,
+rotations and flips. A regular
 paste may overwrite existing blocks and can place clipboard air. **Ctrl+Shift+Use**
 runs an air-only paste: it skips clipboard air and places solid blocks only when
 the destination block is air, never replacing existing blocks. For Cut, only
@@ -101,8 +104,9 @@ and completed operations, for example:
 [MM] Copied (64 blocks incl. NBT)
 ```
 
-A transient action-bar message reports the number of blocks processed while
-you hold Shift+Use. The server stops work on release or shortly after network heartbeats stop. Re-holding resumes an unfinished operation in the same mode/selection.
+Copy, Cut capture and Paste report completion immediately; no progress queue or
+hold is required for them. Fill Cube retains its gradual action-bar progress,
+pausing on release and resuming when Shift+Use is held again.
 
 ## Limits and safety
 
@@ -117,6 +121,8 @@ you hold Shift+Use. The server stops work on release or shortly after network he
   re-hold Shift+Use to resume before changing mode. Back up your test world.
 - A Cut move requires its original source chunks to remain loaded until the
   source has been cleared; cross-dimension moves require both sides loaded.
+- Instant pasting is synchronous on the Minecraft server thread. Very large
+  selections (up to 32,768 blocks) can cause a temporary server tick spike.
 - No region claim or anti-grief plugin integration. Do not give the tool to
   untrusted players on shared servers.
 - The GitHub workflow checks compilation and publishes tagged stable builds; it does
@@ -124,7 +130,7 @@ you hold Shift+Use. The server stops work on release or shortly after network he
 
 ## Install and build
 
-Download the **[v1.0.2 stable release](https://github.com/xt9y-org/26.3-MatterManipulator/releases/tag/v1.0.2)** and install its `matter-manipulator-26.3-1.0.2.jar`. Remove older alpha versions from the mods folder.
+Download the **[v1.0.3 stable release](https://github.com/xt9y-org/26.3-MatterManipulator/releases/tag/v1.0.3)** and install its `matter-manipulator-26.3-1.0.3.jar`. Remove older alpha versions from the mods folder.
 Give yourself the Matter Manipulator:
 
 ```mcfunction

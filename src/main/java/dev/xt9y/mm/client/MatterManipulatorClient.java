@@ -23,7 +23,7 @@ import dev.xt9y.mm.HoldPayload;
 
 /**
  * Debounced GTNH-style inputs: RMB marks adjacent position; short Shift+RMB
- * marks the targeted block; Shift+RMB >=1 s starts the progressive edit.
+ * marks the targeted block; Fill holds 0.25 s, Paste applies immediately.
  */
 public final class MatterManipulatorClient implements ClientModInitializer {
     private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(
@@ -90,11 +90,26 @@ public final class MatterManipulatorClient implements ClientModInitializer {
             .add(mc.player.getLookAngle().scale(5.0)));
     }
 
-    // Vanilla use callbacks fire even on a click shorter than one client tick.
-    // Remember the actual targeted block now and commit selection on release,
-    // unless the 250 ms hold has started editing.
+    // Vanilla callbacks also catch taps shorter than one client tick. A
+    // Paste starts immediately on Shift+Use; only Fill Cube keeps its hold.
     private void armShiftUse(BlockPos target) {
         if (shiftedStartNanos != 0 || building) return;
+        if ("paste".equals(Preview.mode)) {
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc.player != null && mc.gui.screen() == null
+                    && mc.player.getMainHandItem().is(MatterManipulatorMod.TOOL)) {
+                BlockPos pos = adjacent(mc);
+                boolean airOnly = control.isDown();
+                if (hold("start:" + pos.getX() + ":" + pos.getY() + ":" + pos.getZ()
+                        + (airOnly ? ":air" : ""))) {
+                    shiftedStartNanos = System.nanoTime();
+                    shiftedTarget = null;
+                    building = true;
+                    heartbeatTicks = 0;
+                    return;
+                }
+            }
+        }
         shiftedStartNanos = System.nanoTime();
         shiftedTarget = target;
     }
@@ -176,7 +191,8 @@ public final class MatterManipulatorClient implements ClientModInitializer {
                 if (!building && !down && !"paste".equals(Preview.mode))
                     select(shiftedTarget);
                 cancelHold();
-            } else if (!building && now - shiftedStartNanos >= HOLD_NANOS) {
+            } else if (!building && ("paste".equals(Preview.mode)
+                    || now - shiftedStartNanos >= HOLD_NANOS)) {
                 BlockPos target = adjacent(mc);
                 // Don't claim the operation started when the server doesn't
                 // advertise our packet channel (e.g. mod missing server-side).

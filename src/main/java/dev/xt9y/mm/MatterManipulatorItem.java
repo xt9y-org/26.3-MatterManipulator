@@ -51,7 +51,8 @@ public final class MatterManipulatorItem extends Item {
         lines.accept(Component.literal("M / Ctrl+G: Fill Cube geometry (M + wheel)").withStyle(ChatFormatting.AQUA));
         lines.accept(Component.literal("Ctrl+C / Ctrl+X / Ctrl+V: Copy / Cut / Paste").withStyle(ChatFormatting.GRAY));
         lines.accept(Component.literal("Use: select adjacent / short Shift+Use: select block").withStyle(ChatFormatting.GRAY));
-        lines.accept(Component.literal("Hold Shift + Use for 0.25s: apply gradually").withStyle(ChatFormatting.GRAY));
+        lines.accept(Component.literal("Fill: hold Shift+Use 0.25s to apply gradually").withStyle(ChatFormatting.GRAY));
+        lines.accept(Component.literal("Paste: Shift+Use applies instantly").withStyle(ChatFormatting.GRAY));
         lines.accept(Component.literal("Cut: source is removed after pasting").withStyle(ChatFormatting.GRAY));
         lines.accept(Component.literal("Paste: Use to lock, Ctrl+V to reposition").withStyle(ChatFormatting.GRAY));
         lines.accept(Component.literal("Paste: R rotate Y 90°, Shift+R rotate X 90°").withStyle(ChatFormatting.GRAY));
