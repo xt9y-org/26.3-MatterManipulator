@@ -38,6 +38,7 @@ public final class MatterManipulatorClient implements ClientModInitializer {
     private final KeyMapping cut = key("key.mm-cut", InputConstants.KEY_X);
     private final KeyMapping paste = key("key.mm-paste", InputConstants.KEY_V);
     private final KeyMapping reset = key("key.mm-reset", InputConstants.KEY_Z);
+    private final KeyMapping rotate = key("key.mm-rotate", InputConstants.KEY_R);
     private final KeyMapping flipX = key("key.mm-flip-x", InputConstants.KEY_X);
     private final KeyMapping flipY = key("key.mm-flip-y", InputConstants.KEY_Y);
     private final KeyMapping flipZ = key("key.mm-flip-z", InputConstants.KEY_Z);
@@ -110,6 +111,7 @@ public final class MatterManipulatorClient implements ClientModInitializer {
         boolean ready = mc.player != null && mc.gui.screen() == null
             && mc.player.getMainHandItem().is(MatterManipulatorMod.TOOL);
         boolean ctrl = ready && control.isDown();
+        boolean shift = ready && (mc.hasShiftDown() || mc.options.keyShift.isDown());
         boolean changedMode = false;
 
         while (cycle.consumeClick()) if (ready) {
@@ -144,13 +146,17 @@ public final class MatterManipulatorClient implements ClientModInitializer {
         }
 
         boolean flipping = ready && !ctrl && "paste".equals(Preview.mode);
+        while (rotate.consumeClick()) if (flipping) {
+            cancelHold();
+            command(mc, "rotate " + (shift ? "x" : "y"));
+            changedMode = true;
+        }
         while (flipX.consumeClick()) if (flipping) { cancelHold(); command(mc, "flip x"); changedMode = true; }
         while (flipY.consumeClick()) if (flipping) { cancelHold(); command(mc, "flip y"); changedMode = true; }
         while (flipZ.consumeClick()) if (flipping) { cancelHold(); command(mc, "flip z"); changedMode = true; }
 
         // Minecraft's configured Use Item/Place Block binding (mouse or keyboard).
         boolean down = ready && mc.options.keyUse.isDown();
-        boolean shift = ready && (mc.hasShiftDown() || mc.options.keyShift.isDown());
         long now = System.nanoTime();
 
         if (changedMode || !ready) {
@@ -174,7 +180,9 @@ public final class MatterManipulatorClient implements ClientModInitializer {
                 BlockPos target = adjacent(mc);
                 // Don't claim the operation started when the server doesn't
                 // advertise our packet channel (e.g. mod missing server-side).
-                if (hold("start:" + target.getX() + ":" + target.getY() + ":" + target.getZ())) {
+                boolean airOnly = ctrl && "paste".equals(Preview.mode);
+                if (hold("start:" + target.getX() + ":" + target.getY() + ":" + target.getZ()
+                        + (airOnly ? ":air" : ""))) {
                     building = true;
                     heartbeatTicks = 0;
                 }

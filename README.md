@@ -1,6 +1,6 @@
-# Matter Manipulator — Minecraft 26.3 (v1.0.1)
+# Matter Manipulator — Minecraft 26.3 (v1.0.2)
 
-The **v1.0.1** release is a focused Fabric 26.3 implementation of **Fill Cube, Copy, Paste and Cut**.
+The **v1.0.2** release is a focused Fabric 26.3 implementation of **Fill Cube, Copy, Paste and Cut**.
 There is no GUI, radial menu, energy system or other building modes.
 
 **Requires Minecraft 26.3, Java 25 and Fabric API.**
@@ -22,6 +22,9 @@ Install the JAR on both the client and dedicated server.
 | **Use once in Paste mode** | Lock the destination at the current orange preview position |
 | **Ctrl+V while already in Paste mode** | Unlock the destination to reposition the orange preview |
 | **X / Y / Z** (Paste mode, without Ctrl) | Toggle flips around the fixed destination |
+| **R** (Paste mode) | Rotate clipboard 90° clockwise around Y |
+| **Shift+R** (Paste mode) | Rotate clipboard 90° around X |
+| **Ctrl+Shift+Use** (Paste mode, hold 0.25 s) | Air-only paste: place non-air clipboard blocks into air, skipping all occupied destination blocks |
 
 One selection is shared across all modes. The **preview is always
 visible when the tool is held**: blue in Fill, Copy and Cut, and orange in Paste.
@@ -34,8 +37,10 @@ visible when the tool is held**: blue in Fill, Copy and Cut, and orange in Paste
 - In Paste mode: show the destination bounds and the **actual non-air clipboard
   shape** in orange. One Use click locks that orange structure in the world,
   so moving your crosshair no longer moves it. X/Y/Z flip around the locked
-  anchor. Ctrl+V releases the lock to choose a new position. Air positions
-  are still included in the real paste; only the preview excludes them.
+  anchor. R and Shift+R rotate by 90° on Y and X respectively. The preview,
+  collision bounds and actual paste share the same rotations. Ctrl+V releases
+  the lock to choose a new position. Air positions are included in ordinary
+  paste but not in the translucent shape or air-only paste.
 
 The colored ghosts represent block occupancy rather than textured Minecraft
 block models. Supported block-state orientations and full block-entity NBT are
@@ -46,8 +51,8 @@ empty air. Holding Shift+Use does not reselect corners. The offhand can be
 empty in Fill Cube mode to progressively fill with air.
 
 Use `/mm status` to see the selection, `/mm clear` to reset it, or
-`/mm flip x`, `/mm flip y`, `/mm flip z` to toggle the same paste flips
-through commands.
+`/mm flip x`, `/mm flip y`, `/mm flip z` to toggle paste flips,
+or `/mm rotate x` / `/mm rotate y` to rotate by 90° through commands.
 
 ## Modes
 
@@ -75,8 +80,15 @@ the orange preview in place (adjacent to a clicked face, or five blocks in
 front when aiming into air). Flip using X/Y/Z without moving the anchor.
 Hold Shift+Use for at least 0.25 seconds to build at the **locked** location,
 in batches of 48 positions per server tick. Press Ctrl+V to unlock and
-select a new location, retaining the clipboard and flips. A paste may overwrite
-existing blocks.
+select a new location, retaining the clipboard, rotations and flips. A regular
+paste may overwrite existing blocks and can place clipboard air. **Ctrl+Shift+Use**
+runs an air-only paste: it skips clipboard air and places solid blocks only when
+the destination block is air, never replacing existing blocks. For Cut, only
+successfully moved source blocks are cleared and skipped source blocks stay in
+the cut clipboard for a later paste. Y-axis rotations use Minecraft's native
+block-state rotation. X-axis rotations also update common facing/axis properties
+when supported; blocks restricted to horizontal orientations may not visually
+rotate onto walls or ceilings.
 
 ## Chat and progress
 
@@ -112,7 +124,7 @@ you hold Shift+Use. The server stops work on release or shortly after network he
 
 ## Install and build
 
-Download the **[v1.0.1 stable release](https://github.com/xt9y-org/26.3-MatterManipulator/releases/tag/v1.0.1)** and install its `matter-manipulator-26.3-1.0.1.jar`. Remove older alpha versions from the mods folder.
+Download the **[v1.0.2 stable release](https://github.com/xt9y-org/26.3-MatterManipulator/releases/tag/v1.0.2)** and install its `matter-manipulator-26.3-1.0.2.jar`. Remove older alpha versions from the mods folder.
 Give yourself the Matter Manipulator:
 
 ```mcfunction

@@ -6,6 +6,7 @@
   "key.mm-copy": "Matter Manipulator Copy",
   "key.mm-cut": "Matter Manipulator Cut",
   "key.mm-paste": "Matter Manipulator Paste",
+  "key.mm-rotate": "Paste Rotation (R / Shift+R)",
   "key.mm-reset": "Matter Manipulator Clear Selection",
   "key.category.mattermanipulator.controls": "Matter Manipulator"
 }

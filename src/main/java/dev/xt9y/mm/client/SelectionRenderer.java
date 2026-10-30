@@ -16,6 +16,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 
 import dev.xt9y.mm.MatterManipulatorMod;
+import dev.xt9y.mm.PasteTransform;
 
 /**
  * Always-visible mode-colored prediction when holding the tool.
@@ -30,7 +31,7 @@ public final class SelectionRenderer {
                              String mode, java.util.List<BlockPos> clipboard,
                              int clipboardCount, BlockPos clipboardMax,
                              boolean flipX, boolean flipY, boolean flipZ,
-                             boolean locked) {}
+                             int rotationY, int rotationX, boolean locked) {}
     private Selection state;
 
     public void register() {
@@ -56,7 +57,8 @@ public final class SelectionRenderer {
             if (locked) target = Preview.pasteAnchor;
             state = new Selection(Preview.a, Preview.b, hover, target,
                 Preview.mode, Preview.clipboard, Preview.clipboardCount, Preview.clipboardMax,
-                Preview.flipX, Preview.flipY, Preview.flipZ, locked);
+                Preview.flipX, Preview.flipY, Preview.flipZ,
+                Preview.rotationY, Preview.rotationX, locked);
         });
         LevelRenderEvents.COLLECT_SUBMITS.register(this::render);
     }
@@ -124,17 +126,17 @@ public final class SelectionRenderer {
             return;
         }
         BlockPos max = s.clipboardMax();
-        outline(m, v, x, y, z, x+max.getX()+1, y+max.getY()+1, z+max.getZ()+1,
+        BlockPos rotatedMax = PasteTransform.rotatedMax(max, s.rotationY(), s.rotationX());
+        outline(m, v, x, y, z, x+rotatedMax.getX()+1, y+rotatedMax.getY()+1, z+rotatedMax.getZ()+1,
             ORANGE, s.locked() ? .96f : .80f, s.locked() ? .055 : .033);
 
         // Clipboard positions are sampled for previews but complete for actual paste.
         int hintCount = 0;
         for (BlockPos pos : s.clipboard()) {
             if (hintCount++ >= MAX_HINTS) break;
-            int ox = s.flipX() ? max.getX() - pos.getX() : pos.getX();
-            int oy = s.flipY() ? max.getY() - pos.getY() : pos.getY();
-            int oz = s.flipZ() ? max.getZ() - pos.getZ() : pos.getZ();
-            cube(m, v, x+ox, y+oy, z+oz, ORANGE, .32f);
+            BlockPos mapped = PasteTransform.transform(pos, max, s.flipX(), s.flipY(),
+                s.flipZ(), s.rotationY(), s.rotationX());
+            cube(m, v, x+mapped.getX(), y+mapped.getY(), z+mapped.getZ(), ORANGE, .32f);
         }
     }
 

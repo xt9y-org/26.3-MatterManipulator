@@ -45,11 +45,12 @@ public final class MatterManipulatorMod implements ModInitializer {
             String[] parts = payload.data().split(":", -1);
             switch (parts[0]) {
                 case "start" -> {
-                    if (parts.length != 4) return;
+                    if (parts.length != 4 && parts.length != 5) return;
+                    if (parts.length == 5 && !parts[4].equals("air")) return;
                     try {
                         SimpleEditor.begin(context.player(),
                             new BlockPos(Integer.parseInt(parts[1]), Integer.parseInt(parts[2]),
-                                Integer.parseInt(parts[3])));
+                                Integer.parseInt(parts[3])), parts.length == 5);
                     } catch (NumberFormatException ignored) {}
                 }
                 case "select" -> {
@@ -119,6 +120,10 @@ public final class MatterManipulatorMod implements ModInitializer {
                     .executes(ctx -> SimpleEditor.mode(ctx.getSource().getPlayerOrException(), "cut")))
                 .then(Commands.literal("paste")
                     .executes(ctx -> SimpleEditor.mode(ctx.getSource().getPlayerOrException(), "paste")))
+                .then(Commands.literal("rotate")
+                    .then(Commands.argument("axis", StringArgumentType.word())
+                        .executes(ctx -> SimpleEditor.rotate(ctx.getSource().getPlayerOrException(),
+                            StringArgumentType.getString(ctx, "axis")))))
                 .then(Commands.literal("flip")
                     .then(Commands.argument("axis", StringArgumentType.word())
                         .executes(ctx -> SimpleEditor.flip(ctx.getSource().getPlayerOrException(),

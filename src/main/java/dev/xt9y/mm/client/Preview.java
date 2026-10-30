@@ -7,6 +7,7 @@ import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import dev.xt9y.mm.PasteTransform;
 
 /** Only selection corners and the clipboard outline are synchronized. */
 public final class Preview {
@@ -18,6 +19,7 @@ public final class Preview {
     public static BlockPos clipboardMax = BlockPos.ZERO;
     public static int clipboardCount;
     public static boolean flipX, flipY, flipZ;
+    public static int rotationY, rotationX;
     public static boolean cutting = false;
     public static List<BlockPos> clipboard = List.of();
     private static ClientLevel previous;
@@ -30,6 +32,7 @@ public final class Preview {
             clipboardMax = BlockPos.ZERO;
             clipboardCount = 0;
             flipX = flipY = flipZ = false;
+            rotationY = rotationX = 0;
         }
     }
     private static BlockPos parse(String value) {
@@ -54,6 +57,8 @@ public final class Preview {
                 clipboardMax = parse(f[8]);
             }
             pasteAnchor = f.length >= 10 ? parse(f[9]) : null;
+            rotationY = f.length >= 11 ? Integer.parseInt(f[10]) : 0;
+            rotationX = f.length >= 12 ? Integer.parseInt(f[11]) : 0;
         } catch (RuntimeException ignored) {}
     }
     public static void receiveClipboard(String input) {

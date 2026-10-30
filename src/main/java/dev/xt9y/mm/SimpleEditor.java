@@ -22,6 +22,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -46,6 +47,11 @@ final class SimpleEditor {
         final BlockState material;
         final ResourceKey<Level> sourceDimension;
         final List<BlockPos> erasePositions;
+        final List<BlockPos> sourceOffsets = new ArrayList<>();
+        final Set<BlockPos> movedOffsets = new HashSet<>();
+        final Set<BlockPos> placedPositions = new HashSet<>();
+        BlockPos sourceOrigin;
+        boolean airOnly;
         int index;
         int phase;
         long lastPulse;
@@ -74,6 +80,7 @@ final class SimpleEditor {
         ResourceKey<Level> cutDimension;
         BlockPos cutOrigin;
         boolean flipX, flipY, flipZ;
+        int rotationY, rotationX;
         BlockPos pasteAnchor;
         Job job;
     }
@@ -125,7 +132,8 @@ final class SimpleEditor {
             + s.clipboard.size() + "|" + s.cutClipboard + "|"
             + s.flipX + "|" + s.flipY + "|" + s.flipZ + "|"
             + coords(clipboardMax(s.clipboard)) + "|"
-            + (s.pasteAnchor == null ? "_" : coords(s.pasteAnchor));
+            + (s.pasteAnchor == null ? "_" : coords(s.pasteAnchor)) + "|"
+            + s.rotationY + "|" + s.rotationX;
         net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, new StatePayload(data));
     }
 
@@ -165,6 +173,35 @@ final class SimpleEditor {
             // Copy the properties before replacing values on immutable block states.
             List<Property<?>> properties = new ArrayList<>(state.getProperties());
             for (Property<?> property : properties) state = flipVerticalProperty(state, property);
+        }
+        return state;
+    }
+
+    /** Rotate the state on Y using vanilla and on X where the property allows it. */
+    private static <T extends Comparable<T>> BlockState rotateXProperty(BlockState state, Property<T> property) {
+        String name = property.getName();
+        if (!name.equals("facing") && !name.equals("axis") && !name.equals("vertical_direction"))
+            return state;
+        String current = property.getName(state.getValue(property));
+        String rotated = switch (current) {
+            case "north" -> "up";
+            case "up" -> "south";
+            case "south" -> "down";
+            case "down" -> "north";
+            case "y" -> "z";
+            case "z" -> "y";
+            default -> null;
+        };
+        if (rotated == null) return state;
+        return property.getValue(rotated).map(value -> state.setValue(property, value)).orElse(state);
+    }
+
+    private static BlockState transformedState(BlockState original, Session s) {
+        BlockState state = flippedState(original, s);
+        for (int i = 0; i < s.rotationY; i++) state = state.rotate(Rotation.CLOCKWISE_90);
+        for (int i = 0; i < s.rotationX; i++) {
+            for (Property<?> property : new ArrayList<>(state.getProperties()))
+                state = rotateXProperty(state, property);
         }
         return state;
     }
@@ -222,6 +259,26 @@ final class SimpleEditor {
             // Copy/Cut capture immediately; Cut keeps its source until paste.
             begin(player, s.b);
         }
+        return 1;
+    }
+
+    static int rotate(ServerPlayer player, String axis) {
+        if (!creative(player)) return 0;
+        Session s = session(player);
+        if (s.mode != Mode.PASTE) return 0;
+        if (s.job != null) {
+            s.job.active = false;
+            s.job = null;
+        }
+        int steps;
+        switch (axis.toLowerCase(java.util.Locale.ROOT)) {
+            case "y" -> { s.rotationY = (s.rotationY + 1) % 4; steps = s.rotationY; }
+            case "x" -> { s.rotationX = (s.rotationX + 1) % 4; steps = s.rotationX; }
+            default -> { return 0; }
+        }
+        sync(player, s);
+        say(player, "Paste rotated " + axis.toUpperCase(java.util.Locale.ROOT)
+            + " " + (steps * 90) + "° clockwise");
         return 1;
     }
 
@@ -296,7 +353,7 @@ final class SimpleEditor {
                 s.pasteAnchor = clicked.immutable();
                 sync(player, s);
                 say(player, "Paste locked at " + coords(s.pasteAnchor)
-                    + " | X/Y/Z flip, Shift+Use to build, Ctrl+V to move");
+                    + " | R/Shift+R rotate, X/Y/Z flip, Shift+Use build, Ctrl+Shift+Use air-only");
             }
             return;
         }
@@ -362,6 +419,10 @@ final class SimpleEditor {
     }
 
     static int begin(ServerPlayer player, BlockPos target) {
+        return begin(player, target, false);
+    }
+
+    static int begin(ServerPlayer player, BlockPos target, boolean airOnly) {
         if (!creative(player) || !player.getMainHandItem().is(MatterManipulatorMod.TOOL)) return 0;
         Session s = session(player);
         if (s.job != null && s.job.mode == s.mode
@@ -382,44 +443,45 @@ final class SimpleEditor {
                 target = s.pasteAnchor;
                 List<BlockPos> positions = new ArrayList<>(s.clipboard.size());
                 List<Cell> cells = new ArrayList<>(s.clipboard.size());
+                List<BlockPos> offsets = new ArrayList<>(s.clipboard.size());
                 BlockPos size = clipboardMax(s.clipboard);
                 for (Map.Entry<BlockPos, Cell> entry : s.clipboard.entrySet()) {
                     BlockPos offset = entry.getKey();
-                    int x = s.flipX ? size.getX() - offset.getX() : offset.getX();
-                    int y = s.flipY ? size.getY() - offset.getY() : offset.getY();
-                    int z = s.flipZ ? size.getZ() - offset.getZ() : offset.getZ();
-                    BlockPos dest = target.offset(x, y, z);
-                    if (!loaded(level, dest)) throw new IllegalArgumentException("Destination includes unloaded/out-of-world blocks");
+                    BlockPos rotated = PasteTransform.transform(offset, size,
+                        s.flipX, s.flipY, s.flipZ, s.rotationY, s.rotationX);
+                    BlockPos dest = target.offset(rotated);
+                    if (!loaded(level, dest))
+                        throw new IllegalArgumentException("Destination includes unloaded/out-of-world blocks");
                     Cell original = entry.getValue();
-                    Cell transformed = new Cell(flippedState(original.state(), s), original.nbt());
+                    // Air-only paste must never clear existing structures or
+                    // write clipboard air into the destination.
+                    if (airOnly && original.state().isAir()) continue;
+                    Cell transformed = new Cell(transformedState(original.state(), s), original.nbt());
                     validateEntity(level, dest, transformed);
                     positions.add(dest);
                     cells.add(transformed);
+                    offsets.add(offset);
                 }
                 ResourceKey<Level> sourceDimension = null;
-                List<BlockPos> erasePositions = List.of();
+                List<BlockPos> erasePositions = new ArrayList<>();
                 if (s.cutClipboard) {
                     if (s.cutDimension == null || s.cutOrigin == null)
                         throw new IllegalArgumentException("Cut source is missing");
                     ServerLevel sourceLevel = player.level().getServer().getLevel(s.cutDimension);
                     if (sourceLevel == null)
                         throw new IllegalArgumentException("Cut source dimension is unavailable");
-
-                    // Paste first, then erase only source positions not covered
-                    // by the destination (also safe for overlapping flipped moves).
-                    Set<BlockPos> destinations = s.cutDimension.equals(level.dimension())
-                        ? new HashSet<>(positions) : Set.of();
-                    erasePositions = new ArrayList<>(s.clipboard.size());
-                    for (BlockPos offset : s.clipboard.keySet()) {
+                    for (BlockPos offset : offsets) {
                         BlockPos source = s.cutOrigin.offset(offset);
                         if (!loaded(sourceLevel, source))
                             throw new IllegalArgumentException("Cut source contains unloaded/out-of-world blocks");
-                        if (!destinations.contains(source)) erasePositions.add(source);
                     }
                     sourceDimension = s.cutDimension;
                 }
                 job = new Job(s.mode, level.dimension(), positions, cells, target, null,
                     sourceDimension, erasePositions);
+                job.sourceOffsets.addAll(offsets);
+                job.sourceOrigin = s.cutOrigin;
+                job.airOnly = airOnly;
             } else {
                 List<BlockPos> positions = selected(level, s);
                 BlockPos origin = lower(s.a, s.b);
@@ -497,16 +559,28 @@ final class SimpleEditor {
             int total = job.mode == Mode.PASTE && job.phase == 1
                 ? job.erasePositions.size() : job.positions.size();
             if (job.index == total) {
-                if (job.mode == Mode.PASTE && job.phase == 0 && !job.erasePositions.isEmpty()) {
-                    // Never erase the source before the destination has been written.
-                    job.phase = 1;
-                    job.index = 0;
-                    total = job.erasePositions.size();
+                if (job.mode == Mode.PASTE && job.phase == 0 && job.sourceDimension != null) {
+                    // Determine cleanup from blocks actually pasted, not skipped
+                    // positions. Preserve destinations that overlap the source.
+                    boolean sameDimension = job.sourceDimension.equals(job.dimension);
+                    for (BlockPos offset : job.movedOffsets) {
+                        BlockPos source = job.sourceOrigin.offset(offset);
+                        if (!sameDimension || !job.placedPositions.contains(source))
+                            job.erasePositions.add(source);
+                    }
+                    if (!job.erasePositions.isEmpty()) {
+                        job.phase = 1;
+                        job.index = 0;
+                    } else {
+                        finish(player, session, job);
+                        break;
+                    }
                 } else {
                     finish(player, session, job);
                     break;
                 }
             }
+
             boolean erasingSource = job.mode == Mode.PASTE && job.phase == 1;
             BlockPos pos = erasingSource ? job.erasePositions.get(job.index)
                 : job.positions.get(job.index);
@@ -521,7 +595,15 @@ final class SimpleEditor {
                     if (erasingSource) {
                         write(workLevel, pos, new Cell(Blocks.AIR.defaultBlockState(), null));
                     } else {
-                        write(workLevel, pos, job.destinationCells.get(job.index));
+                        Cell cell = job.destinationCells.get(job.index);
+                        // Recheck at the moment of the write; an occupied block
+                        // must never be overwritten by an air-only operation.
+                        if (!job.airOnly || (cell.state().isAir() == false
+                                && workLevel.getBlockState(pos).isAir())) {
+                            write(workLevel, pos, cell);
+                            job.movedOffsets.add(job.sourceOffsets.get(job.index));
+                            job.placedPositions.add(pos);
+                        }
                     }
                 }
                 case COPY, CUT -> job.captured.put(pos.subtract(job.origin), snapshot(workLevel, pos));
@@ -530,7 +612,8 @@ final class SimpleEditor {
         }
         if (session.job == job && level.getGameTime() % 5 == 0) {
             boolean clearing = job.mode == Mode.PASTE && job.phase == 1;
-            String verb = clearing ? "Moving (clearing source)" : title(job.mode);
+            String verb = clearing ? "Moving (clearing source)"
+                : job.airOnly ? "Paste (air only)" : title(job.mode);
             int total = clearing ? job.erasePositions.size() : job.positions.size();
             progress(player, verb + " " + job.index + "/" + total);
         }
@@ -545,11 +628,16 @@ final class SimpleEditor {
             syncClipboard(player, s);
             sync(player, s);
         } else if (job.mode == Mode.PASTE && s.cutClipboard) {
-            // Destination was placed and the source was cleared.
-            s.clipboard = Map.of();
-            s.cutClipboard = false;
-            s.cutDimension = null;
-            s.cutOrigin = null;
+            // Air-only paste may move only part of a cut. Keep all skipped
+            // source cells available for a later paste rather than losing them.
+            Map<BlockPos, Cell> remaining = new LinkedHashMap<>(s.clipboard);
+            for (BlockPos offset : job.movedOffsets) remaining.remove(offset);
+            s.clipboard = remaining;
+            if (remaining.isEmpty()) {
+                s.cutClipboard = false;
+                s.cutDimension = null;
+                s.cutOrigin = null;
+            }
             syncClipboard(player, s);
             sync(player, s);
         }
@@ -559,8 +647,10 @@ final class SimpleEditor {
             case FILL -> "Cube filled (" + job.positions.size() + " blocks)";
             case COPY -> "Copied (" + s.clipboard.size() + " blocks incl. NBT)";
             case CUT -> "Cut captured (" + s.clipboard.size() + " blocks) — paste to move";
-            case PASTE -> "Pasted (" + job.positions.size() + " blocks incl. NBT)"
-                + (job.sourceDimension == null ? "" : " — cut source cleared");
+            case PASTE -> (job.airOnly ? "Air-only pasted " + job.movedOffsets.size()
+                + " blocks" : "Pasted " + job.movedOffsets.size() + " blocks incl. NBT")
+                + (job.sourceDimension == null ? ""
+                    : " — moved source cleared, remaining cut cells: " + s.clipboard.size());
         });
     }
 
