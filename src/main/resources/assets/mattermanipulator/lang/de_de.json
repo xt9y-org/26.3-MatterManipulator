@@ -1,7 +1,8 @@
 {
   "item.mattermanipulator.matter_manipulator": "Matter Manipulator",
-  "key.mattermanipulator.menu": "Füllen / Kopieren / Einfügen / Ausschneiden",
+  "key.mattermanipulator.menu": "Geometriemodus (Würfel füllen)",
   "key.mm-ctrl": "Matter Manipulator Modifikator",
+  "key.mm-geometry": "Matter Manipulator Geometrie (Strg+G)",
   "key.mm-copy": "Matter Manipulator Kopieren",
   "key.mm-cut": "Matter Manipulator Ausschneiden",
   "key.mm-paste": "Matter Manipulator Einfügen",

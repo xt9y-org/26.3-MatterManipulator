@@ -30,7 +30,9 @@ public final class MatterManipulatorClient implements ClientModInitializer {
         Identifier.fromNamespaceAndPath(MatterManipulatorMod.MOD_ID, "controls"));
     private static final long HOLD_NANOS = 250_000_000L;
 
+    private static MatterManipulatorClient instance;
     private final KeyMapping cycle = key("key.mattermanipulator.menu", InputConstants.KEY_M);
+    private final KeyMapping geometry = key("key.mm-geometry", InputConstants.KEY_G);
     private final KeyMapping control = key("key.mm-ctrl", InputConstants.KEY_LCONTROL);
     private final KeyMapping copy = key("key.mm-copy", InputConstants.KEY_C);
     private final KeyMapping cut = key("key.mm-cut", InputConstants.KEY_X);
@@ -45,6 +47,14 @@ public final class MatterManipulatorClient implements ClientModInitializer {
     private BlockPos shiftedTarget;
     private boolean building;
     private int heartbeatTicks;
+
+    /** The one-entry geometry wheel must not scroll the hotbar. */
+    public static boolean holdsGeometryWheel() {
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        return instance != null && mc.player != null && mc.gui.screen() == null
+            && mc.player.getMainHandItem().is(MatterManipulatorMod.TOOL)
+            && instance.cycle.isDown();
+    }
 
     private static KeyMapping key(String name, int code) {
         return KeyMappingHelper.registerKeyMapping(
@@ -104,7 +114,12 @@ public final class MatterManipulatorClient implements ClientModInitializer {
 
         while (cycle.consumeClick()) if (ready) {
             cancelHold();
-            command(mc, "mode next");
+            command(mc, "mode fill");
+            changedMode = true;
+        }
+        while (geometry.consumeClick()) if (ctrl) {
+            cancelHold();
+            command(mc, "mode fill");
             changedMode = true;
         }
         while (copy.consumeClick()) if (ctrl) {
@@ -173,6 +188,7 @@ public final class MatterManipulatorClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        instance = this;
         UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
             if (level.isClientSide() && hand == InteractionHand.MAIN_HAND
                     && player.getMainHandItem().is(MatterManipulatorMod.TOOL)

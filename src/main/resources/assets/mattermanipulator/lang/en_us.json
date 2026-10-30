@@ -1,7 +1,8 @@
 {
   "item.mattermanipulator.matter_manipulator": "Matter Manipulator",
-  "key.mattermanipulator.menu": "Cycle Fill / Copy / Paste / Cut",
+  "key.mattermanipulator.menu": "Geometry mode (Fill Cube)",
   "key.mm-ctrl": "Matter Manipulator Modifier",
+  "key.mm-geometry": "Matter Manipulator Geometry (Ctrl+G)",
   "key.mm-copy": "Matter Manipulator Copy",
   "key.mm-cut": "Matter Manipulator Cut",
   "key.mm-paste": "Matter Manipulator Paste",

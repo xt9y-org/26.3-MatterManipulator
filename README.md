@@ -1,6 +1,6 @@
-# Matter Manipulator — Minecraft 26.3 (v1.0.0)
+# Matter Manipulator — Minecraft 26.3 (v1.0.1)
 
-The **v1.0.0** release is a focused Fabric 26.3 implementation of **Fill Cube, Copy, Paste and Cut**.
+The **v1.0.1** release is a focused Fabric 26.3 implementation of **Fill Cube, Copy, Paste and Cut**.
 There is no GUI, radial menu, energy system or other building modes.
 
 **Requires Minecraft 26.3, Java 25 and Fabric API.**
@@ -14,7 +14,9 @@ Install the JAR on both the client and dedicated server.
 | **Short Shift+Use** (release before 0.25 s) | Select the **actual targeted block** instead of the adjacent position |
 | **Hold Shift+Use for 0.25 seconds or longer** | Begin the current operation in batches; do not change selection |
 | **Release Shift or Use** | Pause; hold again to resume the same queued job |
-| **M** | Cycle Fill Cube → Copy → Paste → Cut without resetting the region |
+| **M** | Enter Geometry mode (Fill Cube); no longer cycles Copy/Paste/Cut |
+| **Hold M + mouse wheel** | Geometry wheel: Fill Cube is currently the only option; scrolling does not change the hotbar |
+| **Ctrl+G** | Enter Geometry mode (Fill Cube) |
 | **Ctrl+C / Ctrl+X / Ctrl+V** | Switch to Copy / Cut / Paste |
 | **Ctrl+Z** | Clear the current selection |
 | **Use once in Paste mode** | Lock the destination at the current orange preview position |
@@ -60,10 +62,13 @@ progressively scans the region without editing the world.
 All states, air blocks, and complete supported block-entity NBT (including
 chest and other inventories) are captured.
 
-**Cut:** Select a region, switch to Cut, then hold Shift+Use.
-The tool first captures every source block with its NBT and only then begins
-erasing source blocks progressively. The saved clipboard is retained until
-you paste it; once pasted, it is cleared to avoid accidentally repeating the move.
+**Cut:** Select a region and press Ctrl+X (or switch to Cut). The complete
+source region and block-entity NBT are captured automatically, just like Copy.
+The original blocks **remain in place** until the destination has been pasted.
+After all destination blocks are placed, source blocks outside the destination
+are gradually erased. Overlapping source/destination regions are handled without
+erasing newly pasted blocks, including when the paste is flipped. The cut clipboard
+is cleared only after the move finishes, avoiding an accidental second move.
 
 **Paste:** Switch to Paste and look at your destination. Use once to lock
 the orange preview in place (adjacent to a clicked face, or five blocks in
@@ -96,7 +101,10 @@ you hold Shift+Use. The server stops work on release or shortly after network he
 - All source and destination chunks must be loaded; the clipboard is in memory
   and disappears when the server restarts.
 - Changing mode or selection during a partially finished edit cancels the queued
-  operation, **not** blocks already edited. Back up your test world.
+  operation, **not** blocks already edited. If a Cut paste is interrupted,
+  re-hold Shift+Use to resume before changing mode. Back up your test world.
+- A Cut move requires its original source chunks to remain loaded until the
+  source has been cleared; cross-dimension moves require both sides loaded.
 - No region claim or anti-grief plugin integration. Do not give the tool to
   untrusted players on shared servers.
 - The GitHub workflow checks compilation and publishes tagged stable builds; it does
@@ -104,7 +112,7 @@ you hold Shift+Use. The server stops work on release or shortly after network he
 
 ## Install and build
 
-Download the **[v1.0.0 stable release](https://github.com/xt9y-org/26.3-MatterManipulator/releases/tag/v1.0.0)** and install its `matter-manipulator-26.3-1.0.0.jar`. Remove older alpha versions from the mods folder.
+Download the **[v1.0.1 stable release](https://github.com/xt9y-org/26.3-MatterManipulator/releases/tag/v1.0.1)** and install its `matter-manipulator-26.3-1.0.1.jar`. Remove older alpha versions from the mods folder.
 Give yourself the Matter Manipulator:
 
 ```mcfunction

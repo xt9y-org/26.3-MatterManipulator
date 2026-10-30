@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
@@ -42,19 +44,24 @@ final class SimpleEditor {
         final Map<BlockPos, Cell> captured = new LinkedHashMap<>();
         final BlockPos origin;
         final BlockState material;
+        final ResourceKey<Level> sourceDimension;
+        final List<BlockPos> erasePositions;
         int index;
         int phase;
         long lastPulse;
         boolean active;
 
         Job(Mode mode, ResourceKey<Level> dimension, List<BlockPos> positions,
-            List<Cell> destinationCells, BlockPos origin, BlockState material) {
+            List<Cell> destinationCells, BlockPos origin, BlockState material,
+            ResourceKey<Level> sourceDimension, List<BlockPos> erasePositions) {
             this.mode = mode;
             this.dimension = dimension;
             this.positions = positions;
             this.destinationCells = destinationCells;
             this.origin = origin;
             this.material = material;
+            this.sourceDimension = sourceDimension;
+            this.erasePositions = erasePositions;
         }
     }
 
@@ -64,6 +71,8 @@ final class SimpleEditor {
         ResourceKey<Level> dimension;
         Map<BlockPos, Cell> clipboard = Map.of();
         boolean cutClipboard;
+        ResourceKey<Level> cutDimension;
+        BlockPos cutOrigin;
         boolean flipX, flipY, flipZ;
         BlockPos pasteAnchor;
         Job job;
@@ -180,7 +189,8 @@ final class SimpleEditor {
         Session s = session(player);
         Mode next;
         if (requested.equalsIgnoreCase("next")) {
-            next = Mode.values()[(s.mode.ordinal() + 1) % Mode.values().length];
+            // The M geometry wheel currently contains only Fill Cube.
+            next = Mode.FILL;
         } else {
             try {
                 next = Mode.valueOf(requested.toUpperCase(java.util.Locale.ROOT));
@@ -208,8 +218,8 @@ final class SimpleEditor {
             say(player, title(next) + " mode"
                 + (s.a != null && s.b != null ? " | Region selected" : ""));
         }
-        if (next == Mode.COPY && s.a != null && s.b != null) {
-            // Copy captures immediately; no Shift+Use confirmation.
+        if ((next == Mode.COPY || next == Mode.CUT) && s.a != null && s.b != null) {
+            // Copy/Cut capture immediately; Cut keeps its source until paste.
             begin(player, s.b);
         }
         return 1;
@@ -310,7 +320,7 @@ final class SimpleEditor {
             say(player, "Region selected (" + (x * y * z) + " blocks)");
         }
         sync(player, s);
-        if (s.mode == Mode.COPY && s.b != null) {
+        if ((s.mode == Mode.COPY || s.mode == Mode.CUT) && s.b != null) {
             // Automatically scan all blocks/NBT once both corners exist.
             begin(player, s.b);
         }
@@ -386,7 +396,30 @@ final class SimpleEditor {
                     positions.add(dest);
                     cells.add(transformed);
                 }
-                job = new Job(s.mode, level.dimension(), positions, cells, target, null);
+                ResourceKey<Level> sourceDimension = null;
+                List<BlockPos> erasePositions = List.of();
+                if (s.cutClipboard) {
+                    if (s.cutDimension == null || s.cutOrigin == null)
+                        throw new IllegalArgumentException("Cut source is missing");
+                    ServerLevel sourceLevel = player.getServer().getLevel(s.cutDimension);
+                    if (sourceLevel == null)
+                        throw new IllegalArgumentException("Cut source dimension is unavailable");
+
+                    // Paste first, then erase only source positions not covered
+                    // by the destination (also safe for overlapping flipped moves).
+                    Set<BlockPos> destinations = s.cutDimension.equals(level.dimension())
+                        ? new HashSet<>(positions) : Set.of();
+                    erasePositions = new ArrayList<>(s.clipboard.size());
+                    for (BlockPos offset : s.clipboard.keySet()) {
+                        BlockPos source = s.cutOrigin.offset(offset);
+                        if (!loaded(sourceLevel, source))
+                            throw new IllegalArgumentException("Cut source contains unloaded/out-of-world blocks");
+                        if (!destinations.contains(source)) erasePositions.add(source);
+                    }
+                    sourceDimension = s.cutDimension;
+                }
+                job = new Job(s.mode, level.dimension(), positions, cells, target, null,
+                    sourceDimension, erasePositions);
             } else {
                 List<BlockPos> positions = selected(level, s);
                 BlockPos origin = lower(s.a, s.b);
@@ -400,7 +433,8 @@ final class SimpleEditor {
                         throw new IllegalArgumentException("Offhand must contain a block or be empty (air)");
                     }
                 }
-                job = new Job(s.mode, level.dimension(), positions, List.of(), origin, material);
+                job = new Job(s.mode, level.dimension(), positions, List.of(), origin, material,
+                    null, List.of());
             }
             job.active = true;
             job.lastPulse = level.getGameTime();
@@ -423,7 +457,8 @@ final class SimpleEditor {
 
     static int stop(ServerPlayer player) {
         Session s = session(player);
-        if (s.job != null && s.job.mode != Mode.COPY) s.job.active = false;
+        if (s.job != null && s.job.mode != Mode.COPY && s.job.mode != Mode.CUT)
+            s.job.active = false;
         return 1;
     }
 
@@ -440,9 +475,8 @@ final class SimpleEditor {
                 continue;
             }
             ServerLevel level = (ServerLevel)player.level();
-            // Copy is automatically driven to completion; only destructive
-            // operations require continuing Shift+Use heartbeats.
-            if (job.mode != Mode.COPY
+            // Copy and Cut only capture data; actual edits require Shift+Use.
+            if (job.mode != Mode.COPY && job.mode != Mode.CUT
                     && level.getGameTime() - job.lastPulse > HEARTBEAT_TIMEOUT) {
                 job.active = false;
                 continue;
@@ -460,50 +494,62 @@ final class SimpleEditor {
     private static void process(ServerPlayer player, Session session, Job job, ServerLevel level) {
         int budget = BLOCKS_PER_TICK;
         while (budget-- > 0 && session.job == job) {
-            if (job.index == job.positions.size()) {
-                if ((job.mode == Mode.CUT) && job.phase == 0) {
-                    session.clipboard = new LinkedHashMap<>(job.captured);
-                    session.cutClipboard = true;
-                    syncClipboard(player, session);
-                    sync(player, session);
+            int total = job.mode == Mode.PASTE && job.phase == 1
+                ? job.erasePositions.size() : job.positions.size();
+            if (job.index == total) {
+                if (job.mode == Mode.PASTE && job.phase == 0 && !job.erasePositions.isEmpty()) {
+                    // Never erase the source before the destination has been written.
                     job.phase = 1;
                     job.index = 0;
+                    total = job.erasePositions.size();
                 } else {
                     finish(player, session, job);
                     break;
                 }
             }
-            if (session.job != job) break;
-            BlockPos pos = job.positions.get(job.index);
-            if (!loaded(level, pos)) throw new IllegalArgumentException("Chunk unloaded while editing");
+            boolean erasingSource = job.mode == Mode.PASTE && job.phase == 1;
+            BlockPos pos = erasingSource ? job.erasePositions.get(job.index)
+                : job.positions.get(job.index);
+            ServerLevel workLevel = erasingSource
+                ? player.getServer().getLevel(job.sourceDimension) : level;
+            if (workLevel == null || !loaded(workLevel, pos))
+                throw new IllegalArgumentException("Chunk unloaded while editing");
+
             switch (job.mode) {
-                case FILL -> write(level, pos, new Cell(job.material, null));
-                case PASTE -> write(level, pos, job.destinationCells.get(job.index));
-                case COPY, CUT -> {
-                    if (job.phase == 0) {
-                        job.captured.put(pos.subtract(job.origin), snapshot(level, pos));
+                case FILL -> write(workLevel, pos, new Cell(job.material, null));
+                case PASTE -> {
+                    if (erasingSource) {
+                        write(workLevel, pos, new Cell(Blocks.AIR.defaultBlockState(), null));
                     } else {
-                        write(level, pos, new Cell(Blocks.AIR.defaultBlockState(), null));
+                        write(workLevel, pos, job.destinationCells.get(job.index));
                     }
                 }
+                case COPY, CUT -> job.captured.put(pos.subtract(job.origin), snapshot(workLevel, pos));
             }
             job.index++;
         }
         if (session.job == job && level.getGameTime() % 5 == 0) {
-            String verb = job.phase == 1 ? "Cut" : title(job.mode);
-            progress(player, verb + " " + job.index + "/" + job.positions.size());
+            boolean clearing = job.mode == Mode.PASTE && job.phase == 1;
+            String verb = clearing ? "Moving (clearing source)" : title(job.mode);
+            int total = clearing ? job.erasePositions.size() : job.positions.size();
+            progress(player, verb + " " + job.index + "/" + total);
         }
     }
 
     private static void finish(ServerPlayer player, Session s, Job job) {
-        if (job.mode == Mode.COPY) {
+        if (job.mode == Mode.COPY || job.mode == Mode.CUT) {
             s.clipboard = new LinkedHashMap<>(job.captured);
-            s.cutClipboard = false;
+            s.cutClipboard = job.mode == Mode.CUT;
+            s.cutDimension = s.cutClipboard ? job.dimension : null;
+            s.cutOrigin = s.cutClipboard ? job.origin : null;
             syncClipboard(player, s);
             sync(player, s);
         } else if (job.mode == Mode.PASTE && s.cutClipboard) {
+            // Destination was placed and the source was cleared.
             s.clipboard = Map.of();
             s.cutClipboard = false;
+            s.cutDimension = null;
+            s.cutOrigin = null;
             syncClipboard(player, s);
             sync(player, s);
         }
@@ -512,8 +558,9 @@ final class SimpleEditor {
         say(player, switch (job.mode) {
             case FILL -> "Cube filled (" + job.positions.size() + " blocks)";
             case COPY -> "Copied (" + s.clipboard.size() + " blocks incl. NBT)";
-            case CUT -> "Cut (" + job.positions.size() + " blocks) — ready to paste";
-            case PASTE -> "Pasted (" + job.positions.size() + " blocks incl. NBT)";
+            case CUT -> "Cut captured (" + s.clipboard.size() + " blocks) — paste to move";
+            case PASTE -> "Pasted (" + job.positions.size() + " blocks incl. NBT)"
+                + (job.sourceDimension == null ? "" : " — cut source cleared");
         });
     }
 

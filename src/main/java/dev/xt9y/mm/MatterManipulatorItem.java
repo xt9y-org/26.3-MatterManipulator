@@ -48,9 +48,11 @@ public final class MatterManipulatorItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context,
                                 TooltipDisplay display, Consumer<Component> lines, TooltipFlag flag) {
-        lines.accept(Component.literal("M: Fill cube / Copy / Paste / Cut").withStyle(ChatFormatting.AQUA));
+        lines.accept(Component.literal("M / Ctrl+G: Fill Cube geometry (M + wheel)").withStyle(ChatFormatting.AQUA));
+        lines.accept(Component.literal("Ctrl+C / Ctrl+X / Ctrl+V: Copy / Cut / Paste").withStyle(ChatFormatting.GRAY));
         lines.accept(Component.literal("Use: select adjacent / short Shift+Use: select block").withStyle(ChatFormatting.GRAY));
         lines.accept(Component.literal("Hold Shift + Use for 0.25s: apply gradually").withStyle(ChatFormatting.GRAY));
+        lines.accept(Component.literal("Cut: source is removed after pasting").withStyle(ChatFormatting.GRAY));
         lines.accept(Component.literal("Paste: Use to lock, Ctrl+V to reposition").withStyle(ChatFormatting.GRAY));
         lines.accept(Component.literal("Paste mode: X/Y/Z flip axes").withStyle(ChatFormatting.GRAY));
         lines.accept(Component.literal("Empty offhand in Fill mode = Air").withStyle(ChatFormatting.GRAY));
